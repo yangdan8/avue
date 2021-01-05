@@ -1,14 +1,127 @@
 import { validatenull } from './validate';
-import { DIC_PROPS, DIC_SPLIT } from 'global/variable';
+import { DIC_PROPS, DIC_SHOW_SPLIT } from 'global/variable';
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 
-export function hasOwn(obj, key) {
+export function hasOwn (obj, key) {
   return hasOwnProperty.call(obj, key);
 };
-export function getFixed(val = 0, len = 2) {
+export function getFixed (val = 0, len = 2) {
   return Number(val.toFixed(len));
 }
-export function dataURLtoFile(dataurl, filename) {
+export function getAsVal (obj, bind = '') {
+  let result = deepClone(obj);
+  bind.split('.').forEach(ele => {
+    if (!validatenull(ele)) {
+      result = result[ele];
+    }
+  });
+  return result;
+}
+export const loadScript = (type = 'js', url) => {
+  let flag = false;
+  return new Promise((resolve) => {
+    const head = document.getElementsByTagName('head')[0];
+    head.children.forEach(ele => {
+      if ((ele.src || '').indexOf(url) !== -1) {
+        flag = true;
+        resolve();
+      }
+    });
+    if (flag) return;
+    let script;
+    if (type === 'js') {
+      script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.src = url;
+    } else if (type === 'css') {
+      script = document.createElement('link');
+      script.rel = 'stylesheet';
+      script.type = 'text/css';
+      script.href = url;
+    }
+    head.appendChild(script);
+    script.onload = function () {
+      resolve();
+    };
+  });
+};
+export function downFile (data, name) {
+  var saveLink = document.createElementNS('http://www.w3.org/1999/xhtml', 'a');
+  saveLink.href = data;
+  saveLink.download = name;
+  var event = document.createEvent('MouseEvents');
+  event.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+  saveLink.dispatchEvent(event);
+}
+export function strCorNum (list) {
+  list.forEach((ele, index) => {
+    list[index] = Number(ele);
+  });
+  return list;
+}
+export function extend () {
+  var target = arguments[0] || {};
+  var deep = false;
+  var arr = Array.prototype.slice.call(arguments);
+  var i = 1;
+  var options, src, key, copy;
+  var isArray = false;
+  if (typeof target === 'boolean') {
+    deep = target;
+    i++;
+    target = arguments[1];
+  }
+  for (; i < arr.length; i++) { // 循环传入的对象数组
+    if ((options = arr[i]) != null) { // 如果当前值不是null，如果是null不做处理
+      for (key in options) { // for in循环对象中key
+        copy = options[key];
+        src = target[key];
+        // 如果对象中value值任然是一个引用类型
+        if (deep && (toString.call(copy) === '[object Object]' || (isArray = toString.call(copy) == '[object Array]'))) {
+          if (isArray) { // 如果引用类型是数组
+            // 如果目标对象target存在当前key，且数据类型是数组，那就还原此值，如果不是就定义成一个空数组;
+            src = toString.call(src) === '[object Array]' ? src : [];
+          } else {
+            // 如果目标对象target存在当前key，且数据类型是对象，那就还原此值，如果不是就定义成一个空对象;
+            src = toString.call(src) === '[object Object]' ? src : {};
+          }
+          // 引用类型就再次调用extend，递归，直到此时copy是一个基本类型的值。
+          target[key] = extend(deep, src, copy);
+        } else if (copy !== undefined && copy !== src) { // 如果这个值是基本值类型，且不是undefined
+          target[key] = copy;
+        }
+      }
+    }
+  }
+  return target;
+}
+export function createObj (obj, bind) {
+  let list = bind.split('.');
+  let first = list.splice(0, 1)[0];
+  let deep = {};
+  deep[first] = {};
+  if (list.length >= 2) {
+    let start = '{';
+    let end = '}';
+    let result = '';
+    list.forEach(ele => {
+      result = `${result}${start}"${ele}":`;
+    });
+    result = `${result}""`;
+    for (let i = 0; i < list.length; i++) {
+      result = `${result}${end}`;
+    }
+    result = JSON.parse(result);
+    deep[first] = result;
+  }
+  obj = extend(true, obj, deep);
+  return obj;
+}
+export function setAsVal (obj, bind = '', value = '') {
+  eval('obj.' + bind + '="' + value + '"');
+  return obj;
+}
+export function dataURLtoFile (dataurl, filename) {
   let arr = dataurl.split(',');
   let mime = arr[0].match(/:(.*?);/)[1];
   let bstr = atob(arr[1]);
@@ -22,7 +135,7 @@ export function dataURLtoFile(dataurl, filename) {
   });
 }
 
-export function findObject(list, value, key = 'prop') {
+export function findObject (list, value, key = 'prop') {
   let result = -1;
   let type = (() => {
     let result;
@@ -50,7 +163,7 @@ export function findObject(list, value, key = 'prop') {
 /**
  * 生成随机数
  */
-export function randomId() {
+export function randomId () {
   let $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
   let maxPos = $chars.length;
   let id = '';
@@ -116,12 +229,16 @@ export const deepClone = data => {
         }
         return data[i];
       })();
-      delete data[i].$parent;
+      if (data[i]) {
+        delete data[i].$parent;
+      }
       obj.push(deepClone(data[i]));
     }
   } else if (type === 'object') {
     for (var key in data) {
-      delete data.$parent;
+      if (data) {
+        delete data.$parent;
+      }
       obj[key] = deepClone(data[key]);
     }
   }
@@ -131,7 +248,7 @@ export const deepClone = data => {
  * 根据字段数组排序
  */
 export const sortArrys = (list, prop) => {
-  list.sort(function(a, b) {
+  list.sort(function (a, b) {
     if (a[prop] > b[prop]) {
       return -1;
     }
@@ -205,7 +322,7 @@ export const detailDic = (list = [], props = {}, type) => {
  * 根据字典的value显示label
  */
 
-export const findByValue = (dic, value, props, isTree) => {
+export const findByValue = (dic, value, props, isTree, column) => {
   // 如果为空直接返回
   if (validatenull(dic)) return value;
   let result = '';
@@ -220,7 +337,7 @@ export const findByValue = (dic, value, props, isTree) => {
         result.push(findArrayLabel(dic, dicvalue, props));
       }
     }
-    result = result.join(DIC_SPLIT).toString();
+    result = result.join(DIC_SHOW_SPLIT).toString();
 
   } else if (['string', 'number', 'boolean'].includes(typeof value)) {
     result = findLabelNode(dic, value, props) || value;
@@ -339,10 +456,12 @@ export const getPasswordChar = (result = '', char) => {
 export const clearVal = (obj) => {
   if (!obj) return {};
   Object.keys(obj).forEach(ele => {
-    if (Array.isArray(ele[obj])) {
+    if (Array.isArray(obj[ele])) {
       obj[ele] = [];
-    } else if (typeof obj[ele] === 'object') {
+    } else if (obj[ele] !== null && typeof obj[ele] === 'object') {
       obj[ele] = {};
+    } else if (['number', 'boolean'].includes(typeof obj[ele]) || undefined === obj[ele]) {
+      obj[ele] = undefined;
     } else {
       obj[ele] = '';
     }

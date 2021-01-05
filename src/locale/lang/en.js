@@ -8,6 +8,10 @@ export default {
     select: 'please select',
     input: 'please input'
   },
+  upload: {
+    upload: 'upload',
+    tip: 'Drag files here，/'
+  },
   date: {
     start: 'Start date',
     end: 'End date',
@@ -24,6 +28,11 @@ export default {
     empty: 'empty'
   },
   crud: {
+    summary: {
+      count: 'count:',
+      avg: 'avg:',
+      sum: 'sum:'
+    },
     filter: {
       addBtn: 'add',
       clearBtn: 'clear',
@@ -34,12 +43,15 @@ export default {
     tipStartTitle: 'Currently selected',
     tipEndTitle: 'term',
     editTitle: 'edit',
+    copyTitle: 'copy',
     addTitle: 'add',
     viewTitle: 'view',
     filterTitle: 'filter',
     showTitle: 'showTitle',
     menu: 'menu',
     addBtn: 'add',
+    show: 'show',
+    hide: 'hide',
     showBtn: 'show',
     filterBtn: 'filter',
     refreshBtn: 'refresh',
@@ -53,6 +65,7 @@ export default {
     saveBtn: 'save',
     viewBtn: 'view',
     editBtn: 'edit',
+    copyBtn: 'copy',
     delBtn: 'del'
   }
 }

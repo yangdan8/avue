@@ -23,6 +23,12 @@
   <div id="app">
     <avue-tree ref="tree" :option="option" :data="data" @node-click="nodeClick" @update="update" @save="save" @del="del"
       v-model="form">
+      <span class="el-tree-node__label" slot-scope="{ node, data }">
+        <span>
+          <i class="el-icon-user-solid"></i>
+          {{ node.label }}
+        </span>
+      </span>
       <template slot-scope="scope" slot="menu">
         <div class="avue-tree__item" @click.native="tip(scope.node,scope.data)">自定义按钮</di>
       </template>
@@ -91,11 +97,13 @@
         this.$message.success('删除回调')
         done();
       },
-      update(data, done, loading) {
+      update(parent, data, done, loading) {
+        console.log(parent);
         this.$message.success('更新回调')
         done();
       },
-      save(data, done, loading) {
+      save(parent, data, done, loading) {
+        console.log(parent);
         this.$message.success('新增回调')
         this.form.value = new Date().getTime();
         done();

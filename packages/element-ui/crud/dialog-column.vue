@@ -3,10 +3,11 @@
              lock-scroll
              :modal-append-to-body="false"
              append-to-body
+             class="avue-dialog"
              :title="t('crud.showTitle')"
              :size="crud.isMobile?'100%':'50%'"
              :visible.sync="columnBox">
-    <el-transfer :titles="[ '隐藏','显示',]"
+    <el-transfer :titles="[ t('crud.hide'),t('crud.show')]"
                  ref="transfer"
                  filterable
                  v-model="columnIndex"
@@ -49,7 +50,7 @@ export default create({
       this.crud.$emit('update:showColumn', val)
     },
     columnBox (val) {
-      if (val) {
+      if (val && this.crud.isSortable) {
         this.$nextTick(() => {
           this.setSort()
         })

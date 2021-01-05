@@ -1,25 +1,46 @@
 <template>
-  <div class="avue-cell">
+  <div>
     <van-field v-model="textLabel"
+               :rules="rules"
                :placeholder="placeholder"
                :clearable="clearable"
                :left-icon="prefixIcon"
-               is-link
                :disabled="disabled"
-               input-align="right"
+               :input-align="inputAlign"
                :required="required"
                @click.native="handleDateClick"
                readonly
                :icon="suffixIcon"
-               :label="label" />
+               :label="label">
+    </van-field>
     <van-popup v-model="box"
                position="bottom">
-      <van-datetime-picker :title="label"
-                           ref="picker"
+      <van-datetime-picker v-if="isTimeType"
+                           :title="label"
+                           v-model="time"
                            :type="type"
-                           @cancel="handleCancel"
+                           @cancel="hide"
+                           :min-date="minDate"
+                           :max-date="maxDate"
+                           :min-hour="minHour"
+                           :max-hour="maxHour"
+                           :min-minute="minMinute"
+                           :max-minute="maxMinute"
+                           @confirm="handleConfirm" />
+      <van-datetime-picker v-else
+                           :title="label"
+                           v-model="date"
+                           :type="type"
+                           @cancel="hide"
+                           :min-date="minDate"
+                           :max-date="maxDate"
+                           :min-hour="minHour"
+                           :max-hour="maxHour"
+                           :min-minute="minMinute"
+                           :max-minute="maxMinute"
                            @confirm="handleConfirm" />
     </van-popup>
+
   </div>
 </template>
 
@@ -28,115 +49,102 @@ import dayjs from "dayjs";
 import create from "core/create";
 import props from "../../core/common/props.js";
 import event from "../../core/common/event.js";
-import { getDateValues } from "utils/date";
 const formatDafault = {
-  datetime: "yyyy-MM-dd hh:mm:ss",
-  date: "yyyy-MM-dd"
+  datetime: "YYYY-MM-DD hh:mm:ss",
+  date: "YYYY-MM-DD",
+  time: 'hh:mm:ss'
 };
+function formatDetail (val) {
+  return val.replace("dd", "DD").replace("yyyy", "YYYY");
+}
 export default create({
-  name: "date",
   mixins: [props(), event()],
   props: {
+    minDate: Date,
+    maxDate: Date,
+    minHour: [String, Number],
+    maxHour: [String, Number],
+    minMinute: [String, Number],
+    maxMinute: [String, Number],
     valueFormat: {
-      default: function() {
+      default: function () {
         return formatDafault[this.type];
       }
     },
     format: {
-      default: function() {
+      default: function () {
         return formatDafault[this.type];
       }
-    },
-    prefixIcon: {
-      type: String
-    },
-    suffixIcon: {
-      type: String
-    },
-    minRows: {
-      type: Number,
-      default: 3
-    },
-    maxRows: {
-      type: Number,
-      default: 4
     }
   },
-  data() {
+  data () {
     return {
+      date: '',
+      time: '',
+      oldDate: '',
       box: false,
-      textLabel: "",
-      picker: ""
     };
   },
   watch: {
-    value: {
-      handler() {
-        this.initVal();
-        this.init();
+    text: {
+      handler () {
+        this.setDate();
       },
       immediate: true
-    },
-    box() {
-      if (this.box) {
-        setTimeout(() => {
-          this.$refs.picker.$refs.picker.setValues(
-            getDateValues(
-              this.text,
-              this.isTimestamp ? undefined : this.valueFormat
-            )
-          );
-        }, 0);
-      }
-    },
-    text() {
-      this.handleChange(this.value);
     }
   },
   computed: {
-    isTimestamp() {
+    isTimestamp () {
       return this.valueFormat === "timestamp";
+    },
+    isTimeType () {
+      return this.type === "time"
+    },
+    textLabel () {
+      if (this.validatenull(this.oldDate)) {
+        return ''
+      }
+      return dayjs(this.oldDate).format(formatDetail(this.format));
     }
   },
-  created() {},
-  mounted() {},
   methods: {
-    init() {
-      this.handleSetLabel(this.text);
-    },
-    handleSetLabel(value) {
-      const format = this.format.replace("dd", "DD").replace("yyyy", "YYYY");
-      if (!this.validatenull(value)) {
-        this.textLabel = dayjs(value).format(format);
+    setDate () {
+      let value = this.text;
+      if (this.validatenull(value)) {
+        return new Date()
       }
+      if (this.isTimeType) {
+        this.time = value;
+        value = dayjs().format(formatDafault.date) + ` ${value}`
+      }
+      this.date = dayjs(value).toDate()
+      this.oldDate = dayjs(value).toDate()
     },
-    handleDateClick() {
-      this.show();
-      this.handleClick();
-    },
-    handleConfirm(value) {
-      const format = this.format.replace("dd", "DD").replace("yyyy", "YYYY");
-      const valueFormat = this.valueFormat
-        .replace("dd", "DD")
-        .replace("yyyy", "YYYY");
-      this.handleSetLabel(value);
-      if (this.isTimestamp) {
-        this.text = new Date(value).getTime();
+    setVal () {
+      this.oldDate = this.date;
+      if (this.isTimeType) {
+        this.text = this.time;
+      } else if (this.isTimestamp) {
+        this.text = new Date(this.oldDate).getTime();
       } else {
-        this.text = dayjs(value).format(valueFormat);
+        this.text = dayjs(this.oldDate).format(formatDetail(this.valueFormat));
       }
-
-      this.handleChange(this.text);
+    },
+    handleDateClick () {
+      this.handleClick();
+      if (this.disabled || this.readonly) return
+      this.setDate();
+      this.show();
+    },
+    handleConfirm () {
+      this.setVal()
       this.hide();
     },
-    show() {
+    show () {
       this.box = true;
     },
-    hide() {
+    hide () {
       this.box = false;
-    },
-    handleCancel() {
-      this.hide();
     }
   }
 });

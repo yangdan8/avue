@@ -3,10 +3,14 @@
              :class="b()"
              v-model="text"
              :size="size"
+             :loading="loading"
+             :loading-text="loadingText"
              :multiple="multiple"
              :filterable="remote?true:filterable"
              :remote="remote"
              :readonly="readonly"
+             :no-match-text="noMatchText"
+             :no-data-text="noDataText"
              :remote-method="handleRemoteMethod"
              :collapse-tags="tags"
              :clearable="disabled?false:clearable"
@@ -30,7 +34,13 @@
           <slot :name="prop+'Type'"
                 :label="labelKey"
                 :value="valueKey"
-                :item="citem"></slot>
+                :item="citem"
+                v-if="$scopedSlots[prop+'Type']"></slot>
+          <slot :label="labelKey"
+                :value="valueKey"
+                :item="item"
+                v-else-if="$scopedSlots.default">
+          </slot>
         </el-option>
       </el-option-group>
     </template>
@@ -43,7 +53,13 @@
         <slot :name="prop+'Type'"
               :label="labelKey"
               :value="valueKey"
-              :item="item"></slot>
+              :item="item"
+              v-if="typeslot"></slot>
+        <slot :label="labelKey"
+              :value="valueKey"
+              :item="item"
+              v-else-if="$scopedSlots.default">
+        </slot>
       </el-option>
     </template>
 
@@ -61,11 +77,22 @@ export default create({
   mixins: [props(), event()],
   data () {
     return {
-      netDic: []
+      created: false,
+      netDic: [],
+      loading: false,
     };
   },
   props: {
     value: {},
+    loadingText: {
+      type: String,
+    },
+    noMatchText: {
+      type: String,
+    },
+    noDataText: {
+      type: String,
+    },
     drag: {
       type: Boolean,
       default: false
@@ -96,15 +123,17 @@ export default create({
     }
   },
   watch: {
+    value (val) {
+      if (!this.validatenull(val)) {
+        if (this.remote && !this.created) {
+          this.created = true
+          this.handleRemoteMethod(this.multiple ? this.text.join(',') : this.text)
+        }
+      }
+    },
     dic: {
       handler (val) {
         this.netDic = val;
-      },
-      immediate: true
-    },
-    text: {
-      handler (val) {
-        this.handleChange(val);
       },
       immediate: true
     }
@@ -136,13 +165,12 @@ export default create({
       })
     },
     handleRemoteMethod (query) {
+      this.loading = true;
       sendDic({
-        url: (this.dicUrl || '').replace("{{key}}", query),
-        method: this.dicMethod,
-        query: this.dicQuery,
-        resKey: (this.props || {}).res,
-        formatter: this.dicFormatter,
+        column: this.column,
+        value: query,
       }).then(res => {
+        this.loading = false;
         this.netDic = res;
       });
     }

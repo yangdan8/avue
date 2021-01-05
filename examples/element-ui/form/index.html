@@ -31,6 +31,12 @@
         <span>{{ data.label }}</span>
         <span v-if="!node.isLeaf"> ({{ data.children.length }}) </span>
       </template>
+      <span class="el-tree-node__label" slot-scope="{ item }" slot="treeType">
+        <span>
+          <i class="el-icon-user-solid"></i>
+          {{ item.label }}
+        </span>
+      </span>
     </avue-form>
   </div>
 </body>
@@ -40,7 +46,9 @@
     el: '#app',
     data() {
       return {
-        obj: {},
+        obj: {
+          checkbox: ["120000", "110000", "130000"]
+        },
         option: {
           card: false,
           labelWidth: 110,
@@ -61,10 +69,10 @@
             // multiple: true,
             // filterable: true,
             // checkStrictly: true,
-            // typeslot: true,
+            typeslot: true,
             dicData: [{
               label: '一级',
-              value: 0,
+              value: 3,
               children: [
                 {
                   label: '一级1',
@@ -81,6 +89,7 @@
             prop: 'tree',
             type: 'tree',
             multiple: true,
+            typeslot: true,
             checked: (data) => {
               console.log(data)
             },
@@ -106,19 +115,26 @@
             type: 'switch',
             dicData: [
               {
-                label: '开启',
-                value: '0'
+                label: '关闭',
+                value: 0
               },
               {
-                label: '关闭',
-                value: '1'
+                label: '开启',
+                value: 1
               }
             ]
           },
           {
             label: '默认值',
             prop: 'default',
-            value: '22'
+            value: '22',
+            rules: [
+              {
+                required: true,
+                message: '请输入数字',
+                trigger: 'blur'
+              }
+            ]
           },
           {
             label: '多选',
@@ -139,12 +155,11 @@
             prop: 'number',
             type: 'number',
             step: 10,
-            minRows: 1,
             rules: [
               {
                 required: true,
-                message: '请输入数字',
-                trigger: 'blur'
+                type: 'number',
+                message: '请输入数字'
               }
             ]
           },
@@ -158,7 +173,6 @@
             },
             cascaderItem: ['city', 'area'],
             dicUrl: `${baseUrl}/getProvince`,
-            dicData: 'province',
             rules: [
               {
                 required: true,
@@ -210,17 +224,26 @@
             label: '多选',
             prop: 'checkbox',
             type: 'checkbox',
+            max: 5,
+            min: 2,
             props: {
               label: 'name',
               value: 'code'
             },
             span: 24,
+            rules: [
+              {
+                type: 'array',
+                required: true,
+                message: '请输入数字'
+              }
+            ],
             dicUrl: `${baseUrl}/getProvince`
           },
           {
             label: '图标选择器',
             prop: 'icon',
-            type: 'icon-select',
+            type: 'icon',
             iconList: [{
               label: '基本图标',
               list: ['el-icon-info', 'el-icon-error', 'el-icon-error', 'el-icon-success', 'el-icon-warning', 'el-icon-question']
@@ -236,20 +259,14 @@
         }
       }
     },
-    watch: {
-      'obj.selects'() {
-        console.log(1);
-      }
-    },
     mounted() {
       this.obj = {
-        switch: '1',
+        switch: 1,
         selects: '0,1',
         name: 'small',
-        cascader: [0, 1],
-        number: 1,
+        cascader: [3, 1],
+        default: 10,
         tree: [2],
-        checkbox: ['110000'],
         province: '220000',
         city: '220700',
         area: '220702',

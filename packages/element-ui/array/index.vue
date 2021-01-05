@@ -5,20 +5,23 @@
          :key="index">
       <div :class="b('input')">
         <el-tooltip placement="bottom"
-                    :disabled="!isImg || validatenull(item.url)">
+                    :disabled="(!isImg && !isUrl) || validatenull(item)">
           <div slot="content">
             <el-image style="width: 150px"
-                      :src="item.url"
+                      :src="item"
                       @click="openImg(index)"
                       fit="cover"
                       v-if="isImg"></el-image>
+            <el-link type="primary"
+                     :href="item"
+                     v-else-if="isUrl"
+                     :target="target">{{item}}</el-link>
           </div>
-          <el-input v-model="item.url"
-                    @change="onChange"
+          <el-input v-model="text[index]"
                     :placeholder="placeholder"
-                    :disabled="disabled" />
+                    :disabled="disabled"></el-input>
         </el-tooltip>
-        <template v-if="!(disabled ||readonly)">
+        <template v-if="!(disabled ||readonly || alone)">
           <el-button type="primary"
                      icon="el-icon-plus"
                      circle
@@ -49,60 +52,33 @@ export default create({
       text: []
     }
   },
+  computed: {
+    isImg () {
+      return this.type === 'img'
+    },
+    isUrl () {
+      return this.type === 'url'
+    },
+  },
   props: {
+    alone: Boolean,
     type: String,
     size: String,
-    isImg: {
-      type: Boolean,
-      default: function () {
-        return this.type === 'img'
-      }
-    },
     placeholder: String,
     readonly: Boolean,
     disabled: Boolean,
     value: [Array, String],
   },
-  watch: {
-    value: {
-      handler (val) {
-        if (this.validatenull(val)) {
-          val = [''];
-        }
-        if ((this.isNumber || this.isString) && !Array.isArray(val)) {
-          val = val.split(',')
-        }
-        this.text = val.map(ele => {
-          return { url: ele }
-        });
-      },
-      immediate: true
-    }
-  },
   methods: {
-    onChange () {
-      let list = this.text.map(ele => {
-        if (this.validatenull(ele.url)) return ele.url;
-        return this.isNumber ? Number(ele.url) : ele.url
-      })
-      if ((this.isNumber || this.isString)) {
-        list = list.join(',')
-      }
-      this.$emit('input', list)
-    },
     add () {
-      this.text.push({
-        url: ""
-      })
-      this.onChange();
+      this.text.push('')
     },
     remove (index) {
       this.text.splice(index, 1)
-      this.onChange();
     },
     openImg (index) {
       const list = this.text.map(ele => {
-        return { thumbUrl: ele.url, url: ele.url }
+        return { thumbUrl: ele, url: ele }
       })
       this.$ImagePreview(list, index);
     },

@@ -1,7 +1,7 @@
 <template>
   <div :class="b()">
     <!-- 搜索组件 -->
-    <header-search v-model="searchForm"
+    <header-search :search="search"
                    ref="headerSearch">
       <template slot="search"
                 slot-scope="{size,row}">
@@ -16,7 +16,7 @@
               :size="size"></slot>
       </template>
       <template slot-scope="{value,column,dic,size,label,disabled}"
-                v-for="item in columnOption"
+                v-for="item in columnFormOption"
                 :slot="item.prop">
         <slot :value="value"
               :column="column"
@@ -24,7 +24,7 @@
               :size="size"
               :label="label"
               :disabled="disabled"
-              :row="searchForm"
+              :row="search"
               :name="item.prop+'Search'"
               v-if="item.searchslot"></slot>
       </template>
@@ -67,6 +67,7 @@
               :highlight-current-row="tableOption.highlightCurrentRow"
               @current-change="currentRowChange"
               @expand-change="expandChange"
+              @header-dragend="headerDragend"
               :show-summary="tableOption.showSummary"
               :summary-method="tableSummaryMethod"
               :span-method="tableSpanMethod"
@@ -169,13 +170,13 @@
       </column>
       <el-table-column :class="b('btn')"
                        :fixed="vaildData(tableOption.menuFixed,config.menuFixed)"
-                       v-if="vaildData(tableOption.menu,config.menu)"
+                       v-if="vaildData(tableOption.menu,config.menu)&&getPermission('menu')"
                        :label="tableOption.menuTitle || t('crud.menu')"
                        :align="tableOption.menuAlign || config.menuAlign"
                        :header-align="tableOption.menuHeaderAlign || config.menuHeaderAlign"
                        :width="isMobile?(tableOption.menuXsWidth || config.menuXsWidth):( tableOption.menuWidth || config.menuWidth)">
         <template slot-scope="scope">
-          <el-dropdown v-if="menuType==='menu'"
+          <el-dropdown v-if="isMenu"
                        :size="isMediumSize"
                        style="margin-right:9px;">
             <el-button type="primary"
@@ -184,15 +185,19 @@
               <i class="el-icon-arrow-down el-icon--right"></i>
             </el-button>
             <el-dropdown-menu slot="dropdown">
-              <el-dropdown-item v-if="vaildData(tableOption.viewBtn,true)"
+              <el-dropdown-item v-if="vaildData(tableOption.viewBtn,config.viewBtn)"
                                 v-permission="getPermission('viewBtn',scope.row,scope.$index)"
                                 @click.native="rowView(scope.row,scope.$index)">{{t('crud.viewBtn')}}</el-dropdown-item>
               <el-dropdown-item divided
-                                v-if="vaildData(tableOption.editBtn,true)"
+                                v-if="vaildData(tableOption.editBtn,config.editBtn)"
                                 v-permission="getPermission('editBtn',scope.row,scope.$index)"
                                 @click.native="rowEdit(scope.row,scope.$index)">{{t('crud.editBtn')}}</el-dropdown-item>
               <el-dropdown-item divided
-                                v-if="vaildData(tableOption.delBtn,true)"
+                                v-if="vaildData(tableOption.copyBtn,config.copyBtn)"
+                                v-permission="getPermission('copyBtn',scope.row,scope.$index)"
+                                @click.native="rowCopy(scope.row)">{{t('crud.copyBtn')}}</el-dropdown-item>
+              <el-dropdown-item divided
+                                v-if="vaildData(tableOption.delBtn,config.delBtn)"
                                 v-permission="getPermission('delBtn',scope.row,scope.$index)"
                                 @click.native="rowDel(scope.row,scope.$index)">{{t('crud.delBtn')}}</el-dropdown-item>
               <slot name="menuBtn"
@@ -209,34 +214,65 @@
                        :disabled="btnDisabledList[scope.$index]"
                        @click.stop="rowCell(scope.row,scope.$index)"
                        v-permission="getPermission('cellBtn',scope.row,scope.$index)"
-                       v-if="vaildData(tableOption.cellBtn ,config.cellBtn)">{{menuIcon(scope.row.$cellEdit?'saveBtn':'editBtn')}}</el-button>
+                       v-if="vaildData(tableOption.cellBtn ,config.cellBtn)">
+              <template v-if="!isIconMenu">
+                {{menuIcon(scope.row.$cellEdit?'saveBtn':'editBtn')}}
+              </template>
+            </el-button>
             <el-button :type="menuText('danger')"
                        :icon="config.cancelBtnIcon"
                        :size="isMediumSize"
                        :disabled="btnDisabledList[scope.$index]"
-                       @click.stop="rowCanel(scope.row,scope.$index)"
-                       v-if="scope.row.$cellEdit && vaildData(tableOption.cancelBtn,config.cancelBtn)">{{menuIcon('cancelBtn')}}</el-button>
+                       @click.stop="rowCancel(scope.row,scope.$index)"
+                       v-if="scope.row.$cellEdit && vaildData(tableOption.cancelBtn,config.cancelBtn)">
+              <template v-if="!isIconMenu">
+                {{menuIcon('cancelBtn')}}
+              </template>
+            </el-button>
             <el-button :type="menuText('success')"
                        :icon="config.viewBtnIcon"
                        :size="isMediumSize"
                        :disabled="btnDisabled"
                        @click.stop="rowView(scope.row,scope.$index)"
                        v-permission="getPermission('viewBtn',scope.row,scope.$index)"
-                       v-if="vaildData(tableOption.viewBtn,config.viewBtn)">{{menuIcon('viewBtn')}}</el-button>
+                       v-if="vaildData(tableOption.viewBtn,config.viewBtn)">
+              <template v-if="!isIconMenu">
+                {{menuIcon('viewBtn')}}
+              </template>
+            </el-button>
             <el-button :type="menuText('primary')"
                        :icon="config.editBtnIcon"
                        :size="isMediumSize"
                        :disabled="btnDisabled"
                        @click.stop="rowEdit(scope.row,scope.$index)"
                        v-permission="getPermission('editBtn',scope.row,scope.$index)"
-                       v-if="vaildData(tableOption.editBtn,config.editBtn)">{{menuIcon('editBtn')}}</el-button>
+                       v-if="vaildData(tableOption.editBtn,config.editBtn)">
+              <template v-if="!isIconMenu">
+                {{menuIcon('editBtn')}}
+              </template>
+            </el-button>
+            <el-button :type="menuText('primary')"
+                       :icon="config.copyBtnIcon"
+                       :size="isMediumSize"
+                       :disabled="btnDisabled"
+                       @click.stop="rowCopy(scope.row)"
+                       v-permission="getPermission('copyBtn',scope.row,scope.$index)"
+                       v-if="vaildData(tableOption.copyBtn,config.copyBtn)">
+              <template v-if="!isIconMenu">
+                {{menuIcon('copyBtn')}}
+              </template>
+            </el-button>
             <el-button :type="menuText('danger')"
                        :icon="config.delBtnIcon"
                        :size="isMediumSize"
                        :disabled="btnDisabled"
                        @click.stop="rowDel(scope.row,scope.$index)"
                        v-permission="getPermission('delBtn',scope.row,scope.$index)"
-                       v-if="vaildData(tableOption.delBtn,config.delBtn) && !scope.row.$cellEdit">{{menuIcon('delBtn')}}</el-button>
+                       v-if="vaildData(tableOption.delBtn,config.delBtn) && !scope.row.$cellEdit">
+              <template v-if="!isIconMenu">
+                {{menuIcon('delBtn')}}
+              </template>
+            </el-button>
           </template>
           <slot name="menu"
                 :row="scope.row"
@@ -250,6 +286,7 @@
 
     <!-- 分页 -->
     <table-page ref="tablePage"
+                v-if="vaildData(tableOption.page,true)"
                 :page="page"></table-page>
     <!-- 表单 -->
     <dialog-form ref="dialogForm"
@@ -284,6 +321,16 @@
               :name="item.prop+'Error'"
               v-if="item.errorslot"></slot>
       </template>
+      <template slot-scope="scope"
+                v-for="item in columnFormOption"
+                :slot="item.prop+'Type'">
+        <slot v-bind="Object.assign(scope,{
+              row:tableForm,
+              index:tableIndex
+              })"
+              :name="item.prop+'Type'"
+              v-if="item.typeslot"></slot>
+      </template>
       <template slot-scope="{tableForm,type,size,disabled}"
                 slot="menuForm">
         <slot name="menuForm"
@@ -305,7 +352,7 @@
 import create from "core/create";
 import packages from "core/packages";
 import permission from '../../core/directive/permission';
-import init from "../../core/crud/init.js";
+import init from "../../core/common/init.js";
 import tablePage from "./table-page";
 import headerSearch from "./header-search";
 import locale from "../../core/common/locale";
@@ -317,10 +364,9 @@ import dialogForm from "./dialog-form";
 import config from "./config.js";
 import treeToArray, { addAttrs } from "./eval";
 import { calcCascader, formInitVal } from "core/dataformat";
-
 export default create({
   name: "crud",
-  mixins: [init("crud"), locale],
+  mixins: [init(), locale],
   directives: {
     permission
   },
@@ -342,7 +388,6 @@ export default create({
     return {
       reload: true,
       isChild: false,
-      searchForm: {},
       config: config,
       list: [],
       expandList: [],
@@ -361,13 +406,11 @@ export default create({
   created () {
     // 初始化数据
     this.dataInit();
-    //初始化字典
-    this.handleLoadDic();
   },
   mounted () {
     this.refreshTable(() => {
       //如果有搜索激活搜索
-      if (this.$refs.headerSearch) this.$refs.headerSearch.init();
+      this.$refs.headerSearch.init();
       //动态计算表格高度
       this.getTableHeight();
       //是否开启表格排序
@@ -375,8 +418,17 @@ export default create({
     })
   },
   computed: {
+    isIconMenu () {
+      return this.menuType === "icon"
+    },
+    isTextMenu () {
+      return this.menuType === "text"
+    },
+    isMenu () {
+      return this.menuType === "menu"
+    },
     calcHeight () {
-      return this.tableOption.calcHeight || 0
+      return (this.tableOption.calcHeight || 0) + this.$AVUE.calcHeight
     },
     propOption () {
       let result = [];
@@ -384,7 +436,7 @@ export default create({
       function findProp (list) {
         if (!Array.isArray(list)) return
         list.forEach(ele => {
-          if (ele.prop) {
+          if (ele.prop || !ele.children) {
             result.push(ele);
           }
           if (ele.children) {
@@ -422,7 +474,7 @@ export default create({
     dynamicOption () {
       let list = [];
       this.propOption.forEach(ele => {
-        if (ele.prop === 'dynamic') {
+        if (ele.type === 'dynamic') {
           list = list.concat(ele.children.column.map(item => {
             return Object.assign(item, {
               dynamic: true
@@ -456,6 +508,9 @@ export default create({
     rowKey () {
       return this.tableOption.rowKey || "id";
     },
+    rowParentKey () {
+      return this.tableOption.rowParentKey || "parentId";
+    },
     parentOption () {
       return this.tableOption || {};
     },
@@ -470,6 +525,12 @@ export default create({
     }
   },
   watch: {
+    tableOption: {
+      handler () {
+        this.$refs.dialogColumn.columnInit()
+      },
+      deep: true
+    },
     tableForm: {
       handler () {
         this.$emit("input", this.tableForm);
@@ -482,15 +543,17 @@ export default create({
       },
       deep: true
     },
-    data () {
-      this.dataInit();
-      //初始化级联字典
-      this.handleLoadCascaderDic();
-    }
+    data: {
+      handler () {
+        this.dataInit();
+        this.handleLoadCascaderDic()
+      },
+      deep: true
+    },
   },
   props: {
     sortBy: Function,
-    sortOrders: Function,
+    sortOrders: Array,
     sortMethod: Function,
     spanMethod: Function,
     summaryMethod: Function,
@@ -506,7 +569,13 @@ export default create({
     uploadDelete: Function,
     uploadPreview: Function,
     uploadError: Function,
-    permission: [Function, Object],
+    uploadExceed: Function,
+    permission: {
+      type: [Function, Object],
+      default: () => {
+        return {};
+      }
+    },
     value: {
       type: Object,
       default: () => {
@@ -519,6 +588,12 @@ export default create({
         return [];
       }
     },
+    search: {
+      type: Object,
+      default () {
+        return {};
+      }
+    },
     page: {
       type: Object,
       default () {
@@ -526,6 +601,10 @@ export default create({
       }
     },
     tableLoading: {
+      type: Boolean,
+      default: false
+    },
+    disabled: {
       type: Boolean,
       default: false
     },
@@ -539,21 +618,20 @@ export default create({
   },
   methods: {
     getPermission (key, row, index) {
-      if (this.validatenull(this.permission)) {
-        return true;
-      } else if (typeof this.permission === "function") {
+      if (typeof this.permission === "function") {
         return this.permission(key, row, index)
-      } else {
+      } else if (!this.validatenull(this.permission[key])) {
         return this.permission[key]
+      } else {
+        return true;
       }
     },
     getTableHeight () {
-      const clientHeight = document.documentElement.clientHeight;
       if (this.tableOption.height == "auto") {
         this.$nextTick(() => {
           const tableStyle = this.$refs.table.$el;
-          const pageStyle = this.$refs.tablePage.$el;
-          this.tableHeight = clientHeight - tableStyle.offsetTop - (pageStyle.offsetHeight * 3) - this.calcHeight
+          const pageStyle = this.$refs.tablePage ? this.$refs.tablePage.$el.offsetHeight : 0;
+          this.tableHeight = config.clientHeight - tableStyle.offsetTop - pageStyle - this.calcHeight
         })
       } else {
         this.tableHeight = this.tableOption.height;
@@ -633,10 +711,10 @@ export default create({
       return rowKey;
     },
     menuIcon (value) {
-      return this.menuType === "icon" ? "" : (this.vaildData(this.tableOption[value + 'Text'], this.t("crud." + value)));
+      return this.vaildData(this.tableOption[value + 'Text'], this.t("crud." + value))
     },
     menuText (value) {
-      return this.menuType === "text" ? "text" : value;
+      return this.isTextMenu ? "text" : value;
     },
     selectClear () {
       this.$refs.table.clearSelection();
@@ -667,11 +745,15 @@ export default create({
       this.list = this.data;
       //初始化序列的参数
       this.list.forEach((ele, index) => {
-        if (ele.$cellEdit) {
+        if (ele.$cellEdit && !this.formCascaderList[index]) {
           this.formCascaderList[index] = this.deepClone(ele);
         }
         ele.$index = index;
       });
+    },
+    //拖动表头事件
+    headerDragend (newWidth, oldWidth, column, event) {
+      this.$emit("header-dragend", newWidth, oldWidth, column, event);
     },
     //展开或则关闭
     expandChange (row, expand) {
@@ -684,10 +766,7 @@ export default create({
     },
     //刷新事件
     refreshChange () {
-      this.$emit("refresh-change", {
-        page: this.page.defaultPage,
-        searchForm: this.$refs.headerSearch.searchForm
-      });
+      this.$emit("refresh-change");
     },
     // 选中实例
     toggleSelection (rows) {
@@ -782,7 +861,7 @@ export default create({
       this.setSort();
     },
     //行取消
-    rowCanel (row, index) {
+    rowCancel (row, index) {
       if (this.validatenull(row[this.rowKey])) {
         this.list.splice(index, 1);
         return;
@@ -790,6 +869,7 @@ export default create({
       this.formCascaderList[index].$cellEdit = false;
       //设置行数据
       this.$set(this.list, index, this.formCascaderList[index]);
+      delete this.formCascaderList[index]
       //设置级联字典
       this.$set(this.cascaderDIC, index, this.cascaderDicList[index]);
       this.formIndexList.splice(this.formIndexList.indexOf(index), 1);
@@ -817,12 +897,15 @@ export default create({
             row,
             index,
             () => {
+              this.btnDisabledList[index] = false;
+              this.btnDisabled = false;
               row.$cellEdit = false;
               this.$set(this.list, index, row);
+              delete this.formCascaderList[index]
             },
             () => {
               this.btnDisabledList[index] = false;
-              this.btnDisabled = false
+              this.btnDisabled = false;
             }
           );
         })
@@ -856,6 +939,9 @@ export default create({
     searchChange () {
       this.$refs.headerSearch.searchChange();
     },
+    getPropRef (prop) {
+      return this.$refs.dialogForm.$refs.tableForm.getPropRef(prop);
+    },
     //清空
     searchReset () {
       this.$refs.headerSearch.searchReset();
@@ -867,7 +953,14 @@ export default create({
       this.tableIndex = index;
       this.$refs.dialogForm.show("edit", index);
     },
-
+    //复制
+    rowCopy (row) {
+      this.tableForm = this.rowClone(row);
+      delete this.tableForm[this.rowKey]
+      this.$emit("input", this.tableForm);
+      this.tableIndex = -1;
+      this.$refs.dialogForm.show("add");
+    },
     //查看
     rowView (row, index) {
       this.tableForm = this.rowClone(row);
@@ -876,7 +969,7 @@ export default create({
       this.$refs.dialogForm.show("view");
     },
     vaildParent (row) {
-      return this.validatenull(row.parentId)
+      return this.validatenull(row[this.rowParentKey])
     },
     // 删除
     rowDel (row, index) {
@@ -889,8 +982,7 @@ export default create({
           if (this.vaildParent(row)) {
             callback(this.data)
           } else {
-            let parent = this.findObject(this.data, row.parentId, this.rowKey);
-
+            let parent = this.findObject(this.data, row[this.rowParentKey], this.rowKey);
             if (parent === undefined) {
               callback(this.data)
             } else {
@@ -925,11 +1017,13 @@ export default create({
             item => item.name === column.property
           );
           if (index === 0) {
-            sums[index] = this.tableOption.sumText || config.sumText;
+            sums[index] = ''
           } else if (currItem) {
+            let decimals = currItem.decimals || 2;
+            let label = currItem.label;
             switch (currItem.type) {
               case "count":
-                sums[index] = "计数：" + data.length;
+                sums[index] = (label || this.t('crud.summary.count')) + data.length;
                 break;
               case "avg":
                 let avgValues = data.map(item => Number(item[column.property]));
@@ -942,7 +1036,7 @@ export default create({
                     return perv;
                   }
                 }, 0);
-                sums[index] = "平均：" + sums[index].toFixed(2);
+                sums[index] = (label || this.t('crud.summary.avg')) + sums[index].toFixed(decimals);
                 break;
               case "sum":
                 let values = data.map(item => Number(item[column.property]));
@@ -954,7 +1048,7 @@ export default create({
                     return perv;
                   }
                 }, 0);
-                sums[index] = "合计：" + sums[index].toFixed(2);
+                sums[index] = (label || this.t('crud.summary.sum')) + sums[index].toFixed(decimals);
                 break;
             }
           } else {

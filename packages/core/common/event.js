@@ -1,12 +1,23 @@
 import dayjs from 'dayjs';
+import { initVal } from 'core/dataformat';
+function bindEvent (safe, name, event) {
+  typeof safe[name] === 'function' && safe[name]({ value: safe.value, column: safe.column })
+  safe.$emit(name, safe.value, event)
+}
 export default function () {
   return {
     methods: {
-      handleFocus () {
-        typeof this.focus === 'function' && this.focus({ value: this.text, column: this.column })
-      },
-      handleBlur () {
-        typeof this.blur === 'function' && this.blur({ value: this.text, column: this.column })
+      initVal () {
+        this.text = initVal({
+          type: this.type,
+          multiple: this.multiple,
+          dataType: this.dataType,
+          value: this.value,
+          separator: this.separator,
+          callback: (result) => {
+            this.stringMode = result;
+          }
+        });
       },
       getLabelText (item) {
         if (this.validatenull(item)) return ''
@@ -15,28 +26,21 @@ export default function () {
         }
         return item[this.labelKey]
       },
-      handleClick () {
-        const result =
-          this.isString && this.multiple ? this.text.join(',') : this.text;
-        if (typeof this.click === 'function') {
-          this.click({ value: result, column: this.column });
-        }
+      handleFocus (event) {
+        bindEvent(this, 'focus', event)
+      },
+      handleBlur (event) {
+        bindEvent(this, 'blur', event)
+      },
+      handleClick (event) {
+        bindEvent(this, 'click', event)
       },
       handleChange (value) {
         let result = value;
-        if (this.$AVUE.ui.name == 'antd') {
-          if (['date', 'time'].includes(this.type)) {
-            const format = this.format.replace('dd', 'DD').replace('yyyy', 'YYYY');
-            result = dayjs(value._d).format(format);
-          } else if (['radio'].includes(this.type)) {
-            result = value.target.value;
-          }
+        if (this.isString || this.isNumber || this.stringMode || this.listType === "picture-img") {
+          if (Array.isArray(value)) result = value.join(',')
         }
-        this.text = result;
-        if ((this.isString || this.isNumber) && (this.multiple || ['checkbox', 'cascader', 'img', 'array'].includes(this.type))) {
-          result = value.join(',')
-        }
-        if (typeof this.change === 'function') {
+        if (typeof this.change === 'function' && this.column.cell !== true) {
           this.change({ value: result, column: this.column });
         }
         this.$emit('input', result);

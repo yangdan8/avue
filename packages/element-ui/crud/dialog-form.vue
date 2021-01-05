@@ -8,10 +8,10 @@
              v-dialogdrag="vaildData(crud.tableOption.dialogDrag,config.dialogDrag)"
              :class="b('dialog',{'fullscreen':fullscreen})"
              :custom-class="vaildData(crud.tableOption.customClass,config.customClass)"
-             :fullscreen="fullscreen?fullscreen:(crud.isMobile?true:crud.tableOption.dialogFullscreen)"
+             :fullscreen="fullscreen"
              :modal-append-to-body="false"
              append-to-body
-             :top="setPx(crud.tableOption.dialogTop,100)"
+             :top="setPx(dialogTop)"
              :title="dialogTitle"
              :close-on-press-escape="crud.tableOption.dialogEscape"
              :close-on-click-modal="crud.tableOption.dialogClickModal"
@@ -20,7 +20,7 @@
              :visible.sync="boxVisible"
              :size="size?size:width"
              :width="setPx(width)"
-             @close="closeDialog">
+             :before-close="hide">
     <div slot="title"
          :class="b('dialog__header')">
       <span class="el-dialog__title">{{dialogTitle}}</span>
@@ -29,64 +29,70 @@
            class="el-dialog__close el-icon-full-screen"></i>
       </div>
     </div>
-    <div :style="{height:dialogHeight,overflow:'hidden'}"
-         ref="content">
-      <el-scrollbar style="height:100%">
-        <avue-form v-model="tableForm"
-                   v-if="boxVisible"
-                   ref="tableForm"
-                   @submit="handleSubmit"
-                   @error="handleError"
-                   @reset-change="handleReset"
-                   :upload-preview="crud.uploadPreview"
-                   :upload-delete="crud.uploadDelete"
-                   :upload-before="crud.uploadBefore"
-                   :upload-after="crud.uploadAfter"
-                   :upload-error="crud.uploadError"
-                   :option="formOption">
-          <!-- 循环form表单卡槽 -->
-          <template slot-scope="scope"
-                    v-for="item in crud.columnFormOption"
-                    :slot="item.prop">
-            <slot :name="item.prop"
-                  v-if="item.formslot"
-                  v-bind="Object.assign(scope,{
+    <el-scrollbar :style="styleName">
+      <avue-form v-model="tableForm"
+                 v-if="boxVisible"
+                 ref="tableForm"
+                 @submit="handleSubmit"
+                 @tab-click="handleTabClick"
+                 @error="handleError"
+                 :reset="false"
+                 @reset-change="hide"
+                 v-bind="$uploadFun({},crud)"
+                 :option="formOption">
+        <!-- 循环form表单卡槽 -->
+        <template slot-scope="scope"
+                  v-for="item in crud.columnFormOption"
+                  :slot="item.prop">
+          <slot :name="item.prop"
+                v-if="item.formslot"
+                v-bind="Object.assign(scope,{
                   row:item.dynamic?scope.row:tableForm,
                   index:item.dynamic?scope.row.$index:crud.tableIndex,
                 })"></slot>
-          </template>
-          <!-- 循环form表单错误卡槽 -->
-          <template slot-scope="scope"
-                    v-for="item in crud.columnFormOption"
-                    :slot="item.prop+'Error'">
-            <slot :name="item.prop+'Error'"
-                  v-bind="Object.assign(scope,{
+        </template>
+        <!-- 循环form表单错误卡槽 -->
+        <template slot-scope="scope"
+                  v-for="item in crud.columnFormOption"
+                  :slot="item.prop+'Error'">
+          <slot :name="item.prop+'Error'"
+                v-bind="Object.assign(scope,{
                   row:tableForm,
                   index:crud.tableIndex,
                 })"
-                  v-if="item.errorslot"></slot>
-          </template>
-          <!-- 循环form表单标签卡槽 -->
-          <template slot-scope="scope"
-                    v-for="item in crud.columnFormOption"
-                    :slot="item.prop+'Label'">
-            <slot :name="item.prop+'Label'"
-                  v-bind="Object.assign(scope,{
+                v-if="item.errorslot"></slot>
+        </template>
+        <!-- 循环form表单组件自定义卡槽 -->
+        <template slot-scope="scope"
+                  v-for="item in crud.columnFormOption"
+                  :slot="item.prop+'Type'">
+          <slot :name="item.prop+'Type'"
+                v-bind="Object.assign(scope,{
                   row:tableForm,
                   index:crud.tableIndex,
                 })"
-                  v-if="item.labelslot"></slot>
-          </template>
-          <template slot="menuForm"
-                    slot-scope="scope">
-            <slot name="menuForm"
-                  v-bind="Object.assign(scope,{
+                v-if="item.typeslot"></slot>
+        </template>
+        <!-- 循环form表单标签卡槽 -->
+        <template slot-scope="scope"
+                  v-for="item in crud.columnFormOption"
+                  :slot="item.prop+'Label'">
+          <slot :name="item.prop+'Label'"
+                v-bind="Object.assign(scope,{
+                  row:tableForm,
+                  index:crud.tableIndex,
+                })"
+                v-if="item.labelslot"></slot>
+        </template>
+        <template slot="menuForm"
+                  slot-scope="scope">
+          <slot name="menuForm"
+                v-bind="Object.assign(scope,{
                     type:boxType
                   }) "></slot>
-          </template>
-        </avue-form>
-      </el-scrollbar>
-    </div>
+        </template>
+      </avue-form>
+    </el-scrollbar>
   </component>
 </template>
 
@@ -140,10 +146,13 @@ export default create({
       deep: true
     }
   },
-  mounted () {
-
-  },
   computed: {
+    styleName () {
+      return {
+        height: this.dialogHeight,
+        overflow: 'hidden'
+      }
+    },
     isView () {
       return this.boxType === 'view'
     },
@@ -162,6 +171,9 @@ export default create({
     dialogType () {
       return this.isDrawer ? 'elDrawer' : 'elDialog'
     },
+    dialogTop () {
+      return this.crud.tableOption.dialogTop || config.dialogTop
+    },
     isDrawer () {
       return this.crud.tableOption.dialogType === 'drawer';
     },
@@ -169,12 +181,15 @@ export default create({
       if (this.isDrawer) {
         return 'calc(100% - 100px)';
       }
-      return this.setPx(this.crud.tableOption.dialogHeight || config.dialogHeight);
+      if (this.crud.tableOption.dialogHeight === config.dialogHeight) {
+        return this.setPx(config.clientHeight - 3 * this.dialogTop);
+      }
+      return this.setPx(this.crud.tableOption.dialogHeight);
     },
     formOption () {
       let option = this.deepClone(this.crud.tableOption);
       option.boxType = this.boxType;
-      option.column = this.crud.propOption;
+      option.column = this.deepClone(this.crud.propOption);
       option.printBtn = false;
       option.mockBtn = false;
       if (this.isView) {
@@ -200,6 +215,13 @@ export default create({
         option.dicFlag = false;
         option.dicData = this.crud.DIC;
       }
+      if (!this.validatenull(option.dicFlag)) {
+        option.column.forEach(ele => {
+          ele.boxType = this.boxType;
+          ele.dicFlag = ele.dicFlag || option.dicFlag
+        })
+      }
+
       return option;
     },
     dialogTitle () {
@@ -210,6 +232,9 @@ export default create({
     }
   },
   methods: {
+    handleTabClick (tab, event) {
+      this.crud.$emit('tab-click', tab, event)
+    },
     handleFullScreen () {
       if (this.isDrawer) {
         if (this.validatenull(this.size)) {
@@ -226,21 +251,18 @@ export default create({
       }
 
     },
-    handleReset () {
-      this.closeDialog();
-    },
     handleError (error) {
       this.crud.$emit('error', error)
     },
-    handleSubmit () {
+    handleSubmit (form, hide) {
       if (this.isAdd) {
-        this.rowSave();
+        this.rowSave(hide);
       } else if (this.isEdit) {
-        this.rowUpdate();
+        this.rowUpdate(hide);
       }
     },
     initFun () {
-      ['clearValidate', 'validate', 'updateDic'].forEach(ele => {
+      ['clearValidate', 'validate'].forEach(ele => {
         this.crud[ele] = this.$refs.tableForm[ele]
       })
     },
@@ -248,7 +270,6 @@ export default create({
       Object.keys(this.value).forEach(ele => {
         this.tableForm[ele] = this.value[ele];
       });
-      this.$emit("input", this.tableForm);
     },
     //清空表单
     resetForm () {
@@ -256,36 +277,30 @@ export default create({
       this.$emit("input", this.tableForm);
     },
     // 保存
-    rowSave () {
-      this.$refs["tableForm"].validate(vaild => {
-        if (!vaild) return;
-        this.crud.$emit(
-          "row-save",
-          filterDefaultParams(this.tableForm, this.crud.tableOption.translate),
-          this.closeDialog,
-          this.$refs.tableForm.hide
-        );
-      });
+    rowSave (hide) {
+      this.crud.$emit(
+        "row-save",
+        filterDefaultParams(this.tableForm, this.crud.tableOption.translate),
+        this.closeDialog,
+        hide
+      );
     },
     // 更新
-    rowUpdate () {
-      this.$refs["tableForm"].validate(vaild => {
-        if (!vaild) return;
-        const index = this.crud.tableIndex;
-        this.crud.$emit(
-          "row-update",
-          filterDefaultParams(this.tableForm, this.crud.tableOption.translate),
-          this.index,
-          this.closeDialog,
-          this.$refs.tableForm.hide
-        );
-      });
+    rowUpdate (hide) {
+      const index = this.crud.tableIndex;
+      this.crud.$emit(
+        "row-update",
+        filterDefaultParams(this.tableForm, this.crud.tableOption.translate),
+        this.index,
+        this.closeDialog,
+        hide
+      );
     },
     closeDialog (row, index) {
       const callback = () => {
         if (this.isEdit) {
           let obj = this.findObject(this.crud.data, row[this.crud.rowKey], this.crud.rowKey);
-          obj = Object.assign(obj, row);
+          obj = Object.assign(obj || {}, row);
         } else if (this.isAdd) {
           const callback = (list = [], index) => {
             this.validatenull(index) ? list.push(row) : list.splice(index, 0, row);
@@ -295,7 +310,7 @@ export default create({
             if (this.crud.vaildParent(row)) {
               callback(this.crud.data, index)
             } else {
-              let parent = this.findObject(this.crud.data, row.parentId, this.crud.rowKey);
+              let parent = this.findObject(this.crud.data, row[this.crud.rowParentKey], this.crud.rowKey);
               if (parent === undefined) {
                 return callback(this.crud.data, index)
               }
@@ -311,15 +326,14 @@ export default create({
         }
       }
       if (row) callback();
-      this.crud.tableIndex = -1;
-      this.tableForm = {};
       this.hide();
-
-
     },
     // 隐藏表单
-    hide () {
+    hide (done) {
       const callback = () => {
+        done && done();
+        this.crud.tableIndex = -1;
+        this.tableForm = {};
         this.$nextTick(() => {
           this.boxVisible = false;
         });
@@ -336,6 +350,7 @@ export default create({
       this.boxType = type;
       const callback = () => {
         this.$nextTick(() => {
+          this.fullscreen = this.crud.tableOption.dialogFullscreen
           this.boxVisible = true;
         });
       };

@@ -4,6 +4,7 @@
          v-show="searchShow && searchFlag">
       <avue-form :option="option"
                  ref="form"
+                 v-if="flag"
                  @submit="searchChange"
                  @reset-change="resetChange"
                  v-model="searchForm">
@@ -12,6 +13,17 @@
           <slot name="searchMenu"
                 :row="searchForm"
                 :size="size"></slot>
+          <template v-if="isSearchIcon">
+            <el-button type="text"
+                       v-if="show===false"
+                       @click="show=true"
+                       icon="el-icon-arrow-down">展 开</el-button>
+            <el-button type="text"
+                       v-if="show===true"
+                       @click="show=false"
+                       icon="el-icon-arrow-up">收 缩</el-button>
+          </template>
+
         </template>
         <template :slot="item.prop"
                   slot-scope="scope"
@@ -55,6 +67,8 @@ export default cteate({
   mixins: [locale],
   data () {
     return {
+      flag: false,
+      show: false,
       config: config,
       defaultForm: {
         searchForm: {}
@@ -64,10 +78,10 @@ export default cteate({
     };
   },
   props: {
-    value: {
+    search: {
       type: Object,
       default: () => {
-        return {};
+        return {}
       }
     }
   },
@@ -78,17 +92,38 @@ export default cteate({
       },
       immediate: true
     },
+    search: {
+      handler () {
+        this.searchInit();
+      },
+      deep: true,
+    },
     searchForm: {
       handler () {
         this.$emit("input", this.searchForm);
+        this.updateValue();
       },
       deep: true
     }
   },
   created () {
     this.init();
+    this.searchInit();
   },
   computed: {
+    isSearchIcon () {
+      return this.crud.option.searchIcon === true && this.columnLen > this.searchIndex
+    },
+    searchIndex () {
+      return this.crud.option.searchIndex || 2
+    },
+    columnLen () {
+      let count = 0;
+      this.crud.option.column.forEach(ele => {
+        if (ele.search) count++
+      })
+      return count
+    },
     columnOption () {
       return this.option.column || []
     },
@@ -96,35 +131,43 @@ export default cteate({
       const option = this.crud.option;
       const detailColumn = (list = []) => {
         let column = [];
+        let count = 0;
         list.forEach(ele => {
           if (ele.search) {
+            let isCount = count < this.searchIndex
             ele = Object.assign(ele, {
               type: getSearchType(ele),
               multiple: ele.searchMultiple,
+              order: ele.searchOrder,
               detail: false,
-              span: ele.searchSpan || this.config.searchSpan,
+              dicFlag: false,
+              span: ele.searchSpan || option.searchSpan || this.config.searchSpan,
+              gutter: ele.searchGutter || option.searchGutter || this.config.searchGutter,
               labelWidth: ele.searchLabelWidth || option.searchLabelWidth || this.config.searchLabelWidth,
+              labelPosition: ele.searchLabelPosition || option.searchLabelPosition,
               tip: ele.searchTip,
               placeholder: getPlaceholder(ele, 'search'),
               filterable: ele.searchFilterable,
               tipPlacement: ele.searchTipPlacement,
               filterMethod: ele.searchFilterMethod,
               checkStrictly: ele.searchCheckStrictly || option.searchCheckStrictly,
-              gutter: ele.searchGutter || option.searchGutter,
               tags: ele.searchTags,
               row: ele.searchRow,
               size: ele.searchSize,
               formslot: ele.searchslot,
+              clearable: ele.searchClearable,
               rules: ele.searchRules,
               disabled: ele.searchDisabled,
               readonly: ele.searchReadonly,
-              value: ele.searchValue
+              value: ele.searchValue,
+              display: this.isSearchIcon ? (this.show ? true : isCount) : true,
             })
-            let whiteList = ['display', 'disabled', 'readonly']
+            let whiteList = ['disabled', 'readonly']
             whiteList.forEach(key => {
               delete ele[key]
             })
             column.push(ele);
+            count = count + 1;
           }
         })
         return column;
@@ -138,34 +181,42 @@ export default cteate({
         result.column = detailColumn(this.deepClone(this.crud.columnFormOption))
         result = Object.assign(result, {
           tabs: false,
+          enter: this.vaildData(option.searchEnter, true),
           printBtn: false,
           mockBtn: false,
-          size: option.searchSize || this.crud.isMediumSize,
-          gutter: option.searchGutter || this.config.searchGutter,
-          labelWidth: option.searchLabelWidth || this.config.searchLabelWidth,
           submitText: this.vaildData(option.searchBtnText, this.t('crud.searchBtn')),
           submitBtn: this.vaildData(option.searchBtn, this.config.searchSubBtn),
           submitIcon: option.searchBtnIcon || this.config.searchBtnIcon,
           emptyText: this.vaildData(option.emptyBtnText, this.t('crud.emptyBtn')),
           emptyBtn: this.vaildData(option.emptyBtn, this.config.emptyBtn),
           emptyIcon: option.emptyBtnIcon || this.config.emptyBtnIcon,
-          menuSpan: option.searchMenuSpan,
+          menuSpan: (() => {
+            if (this.show || !this.isSearchIcon) {
+              return option.searchMenuSpan
+            } else {
+              return 6
+            }
+          })(),
           dicFlag: false,
           dicData: this.crud.DIC
         })
         return result;
       }
-      return dataDetail(option)
-    },
-    searchSlot () {
-      return !validatenull(this.$slots.search);
+      let result = dataDetail(option)
+      this.flag = !this.validatenull(result.column);
+      return result;
     },
     searchFlag () {
-      if (this.searchSlot) return true;
-      else return !validatenull(this.searchForm);
+      return !validatenull(this.searchForm);
     }
   },
   methods: {
+    searchInit () {
+      this.searchForm = Object.assign(this.searchForm, this.search);
+    },
+    updateValue () {
+      this.crud.$emit('update:search', this.searchForm)
+    },
     //初始化
     init () {
       //扩展搜索的相关api
@@ -182,7 +233,7 @@ export default cteate({
     },
     // 搜索清空
     searchReset () {
-      this.$refs.form.resetFields();
+      this.$refs.form.resetForm();
     },
     handleSearchShow () {
       this.searchShow = !this.searchShow;

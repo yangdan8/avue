@@ -9,24 +9,24 @@
              @change="handleChange"
              @focus="handleFocus"
              @blur="handleBlur"
-             :disabled="disabled"
-             :readonly="true">
+             :disabled="disabled">
     <div v-if="filter"
          style="padding:0 10px;margin:5px 0 0 0;">
       <el-input size="mini"
-                placeholder="输入关键字进行过滤"
-                v-model="filterText"></el-input>
+                :placeholder="filterText"
+                v-model="filterValue"></el-input>
     </div>
     <el-option :value="text">
       <el-tree :data="dicList"
                class="tree-option"
                style="padding:10px 0;"
                :lazy="lazy"
-               :load="treeLoad"
+               :load="handleTreeLoad"
                :node-key="valueKey"
                :accordion="accordion"
                :icon-class="iconClass"
                :show-checkbox="multiple"
+               :expand-on-click-node="expandOnClickNode"
                :props="treeProps"
                :check-strictly="checkStrictly"
                ref="tree"
@@ -45,6 +45,10 @@
                 :value="valueKey"
                 :item="data"
                 v-if="typeslot"></slot>
+          <slot v-else-if="$scopedSlots.default"
+                :label="labelKey"
+                :value="valueKey"
+                :item="data"></slot>
           <span v-else
                 :class="{'avue--disabled':data[disabledKey]}">{{data[labelKey]}}</span>
         </div>
@@ -57,14 +61,15 @@
 import create from "core/create";
 import props from "../../core/common/props.js";
 import event from "../../core/common/event.js";
-import { DIC_SPLIT } from 'global/variable';
+import { DIC_SHOW_SPLIT } from 'global/variable';
+import { detailDataType } from 'utils/util';
 export default create({
   name: "input-tree",
   mixins: [props(), event()],
   data () {
     return {
-      node: {},
-      filterText: "",
+      node: [],
+      filterValue: "",
       box: false,
       labelText: []
     };
@@ -78,9 +83,21 @@ export default create({
       type: Boolean,
       default: false
     },
+    leafOnly: {
+      type: Boolean,
+      default: false
+    },
+    expandOnClickNode: {
+      type: Boolean,
+      default: true
+    },
     filter: {
       type: Boolean,
       default: true
+    },
+    filterText: {
+      type: String,
+      default: '输入关键字进行过滤'
     },
     checkStrictly: {
       type: Boolean,
@@ -114,7 +131,6 @@ export default create({
         if (this.validatenull(value)) {
           this.clearHandle();
         }
-        this.handleChange(value);
       },
     },
     dic () {
@@ -124,7 +140,7 @@ export default create({
       this.initVal();
       this.init();
     },
-    filterText (val) {
+    filterValue (val) {
       this.$refs.tree.filter(val);
     }
   },
@@ -151,21 +167,50 @@ export default create({
       return list;
     },
     keysList () {
-      if (this.validatenull(this.text)) {
-        return [];
+      if (this.validatenull(this.text)) return [];
+      let list = []
+      if (Array.isArray(this.text)) {
+        list = this.text;
       }
-      return this.multiple ? this.text : [this.text];
+      else {
+        list = (this.text + '').split(this.separator)
+        list = list.map(ele => detailDataType(ele, this.dataType))
+      }
+      return list
     },
     labelShow () {
-      return (this.labelText || []).join(DIC_SPLIT).toString()
+      if (this.typeformat) {
+        let list = [];
+        this.node.forEach(ele => {
+          list.push(this.getLabelText(ele))
+        })
+        return list.join(DIC_SHOW_SPLIT).toString()
+      }
+      return (this.labelText || []).join(DIC_SHOW_SPLIT).toString()
     },
   },
   mounted () {
     this.init();
   },
   methods: {
+    handleTreeLoad (node, resolve) {
+      let callback = (list) => {
+        let findDic = (list, value, children) => {
+          list.forEach(ele => {
+            if (ele[this.valueKey] == value) {
+              ele[this.childrenKey] = children
+            } else if (ele[this.childrenKey]) {
+              findDic(ele[this.childrenKey])
+            }
+          })
+        }
+        findDic(this.dic, node.key, list)
+        resolve(list);
+      }
+      this.treeLoad && this.treeLoad(node, callback)
+    },
     // 初始化滚动条
-    initScroll () {
+    initScroll (event) {
       setTimeout(() => {
         this.$nextTick(() => {
           let scrollBar = document.querySelectorAll('.el-scrollbar .el-select-dropdown__wrap')
@@ -174,6 +219,7 @@ export default create({
           })
         })
       }, 0)
+      this.handleClick(event);
     },
     filterNode (value, data) {
       if (!value) return true;
@@ -181,30 +227,38 @@ export default create({
     },
     checkChange (checkedNodes, checkedKeys, halfCheckedNodes, halfCheckedKeys) {
       this.text = [];
+      this.node = [];
       this.labelText = [];
-      const list = this.$refs.tree.getCheckedNodes();
+      const list = this.$refs.tree.getCheckedNodes(this.leafOnly, false);
       list.forEach(node => {
+        this.node.push(node)
         this.text.push(node[this.valueKey]);
         this.labelText.push(node[this.labelKey]);
       });
-      if (typeof this.checked === "function") this.checked(checkedNodes);
-      const result =
-        this.isString && this.multiple ? this.text.join(",") : this.text;
-      this.$emit("input", result);
-      this.$emit("change", result);
+      if (typeof this.checked === "function") this.checked(checkedNodes, checkedKeys, halfCheckedNodes, halfCheckedKeys);
+    },
+    getHalfList () {
+      let list = this.$refs.tree.getCheckedNodes(false, true)
+      list = list.map(ele => ele[this.valueKey])
+      return list;
     },
     init () {
       this.$nextTick(() => {
         this.labelText = [];
+        this.node = [];
         if (this.multiple) {
-          let list = this.$refs.tree.getCheckedNodes()
+          let list = this.$refs.tree.getCheckedNodes(this.leafOnly, false)
           list.forEach(ele => {
             this.labelText.push(ele[this.labelKey])
+            this.node.push(ele);
           })
         } else {
           let node = this.$refs.tree.getNode(this.text)
           if (node) {
-            this.labelText.push(node.data[this.labelKey])
+            let data = node.data
+            this.$refs.tree.setCurrentKey(data[this.valueKey])
+            this.labelText.push(data[this.labelKey])
+            this.node.push(data);
           }
         }
       })
@@ -223,17 +277,12 @@ export default create({
       });
     },
     clearHandle () {
-      let allNode = document.querySelectorAll('.tree-option .el-tree-node')
-      allNode.forEach((element) => element.classList.remove('is-current'))
+      this.$refs.tree.setCurrentKey(null)
       this.$refs.tree.setCheckedKeys([]);
     },
-    handleNodeClick (data) {
-      const callback = () => {
-        this.node = data;
-        this.$refs.main.blur();
-      };
+    handleNodeClick (data, node, nodeComp) {
       if (data.disabled) return
-      if (typeof this.nodeClick === "function") this.nodeClick(data);
+      if (typeof this.nodeClick === "function") this.nodeClick(data, node, nodeComp);
       if (this.multiple) return;
       if (
         (this.validatenull(data[this.childrenKey]) && !this.multiple) ||
@@ -241,28 +290,11 @@ export default create({
       ) {
         const value = data[this.valueKey];
         const label = data[this.labelKey];
-        const result = this.isString && this.multiple ? value.join(",") : value;
         this.text = value;
+        this.node = [data];
         this.labelText = [label];
-        this.$emit("input", result);
-        this.$emit("change", result);
-        callback();
+        this.$refs.main.blur();
       }
-    },
-    handleClick () {
-      const result =
-        this.isString && this.multiple ? this.text.join(",") : this.text;
-      if (typeof this.click === "function")
-        this.click({ value: result, column: this.column });
-    },
-    handleChange (value) {
-      let text = this.text;
-      const result = this.isString && this.multiple ? value.join(",") : value;
-      if (typeof this.change === "function") {
-        this.change({ value: result, column: this.column });
-      }
-      this.$emit("input", result);
-      this.$emit("change", result);
     }
   }
 });

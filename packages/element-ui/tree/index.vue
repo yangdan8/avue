@@ -2,9 +2,9 @@
   <div :class="b()">
     <div :class="b('filter')"
          v-if="vaildData(option.filter,true)">
-      <el-input placeholder="输入关键字进行过滤"
+      <el-input :placeholder="vaildData(option.filterText,'输入关键字进行过滤')"
                 :size="size"
-                v-model="filterText">
+                v-model="filterValue">
         <el-button slot="append"
                    :size="size"
                    @click="parentAdd"
@@ -24,11 +24,22 @@
              :node-key="props.value"
              :check-strictly="checkStrictly"
              :filter-node-method="filterNode"
-             :expand-on-click-node="false"
+             v-loading="loading"
+             :expand-on-click-node="expandOnClickNode"
              @check-change="handleCheckChange"
              @node-click="nodeClick"
              @node-contextmenu="nodeContextmenu"
              :default-expand-all="defaultExpandAll">
+      <span slot-scope="{ node, data }"
+            v-if="$scopedSlots.default">
+        <slot :node="node"
+              :data="data"></slot>
+      </span>
+      <span class="el-tree-node__label"
+            slot-scope="{node}"
+            v-else>
+        <span>{{node.label}}</span>
+      </span>
     </el-tree>
     <div class="el-cascader-panel is-bordered"
          v-if="client.show&&menu"
@@ -67,7 +78,6 @@
 <script>
 import { DIC_PROPS } from 'global/variable';
 import locale from "../../core/common/locale";
-import { deepClone, vaildData } from "utils/util";
 import create from "core/create";
 export default create({
   name: "tree",
@@ -75,6 +85,14 @@ export default create({
   props: {
     iconClass: {
       type: String,
+    },
+    loading: {
+      type: Boolean,
+      default: false
+    },
+    expandOnClickNode: {
+      type: Boolean,
+      default: false
     },
     option: {
       type: Object,
@@ -97,7 +115,7 @@ export default create({
   },
   data () {
     return {
-      filterText: "",
+      filterValue: "",
       client: {
         x: 0,
         y: 0,
@@ -210,9 +228,6 @@ export default create({
       );
     }
   },
-  created () {
-    this.vaildData = vaildData;
-  },
   mounted () {
     document.addEventListener('click', (e) => {
       if (!this.$el.contains(e.target)) this.client.show = false
@@ -220,10 +235,7 @@ export default create({
     this.initFun()
   },
   watch: {
-    option () {
-      this.init();
-    },
-    filterText (val) {
+    filterValue (val) {
       this.$refs.tree.filter(val);
     },
     value (val) {
@@ -255,8 +267,8 @@ export default create({
     handleSubmit (form, done) {
       this.addFlag ? this.save(form, done) : this.update(form, done)
     },
-    nodeClick (data) {
-      this.$emit("node-click", data);
+    nodeClick (data, node, nodeComp) {
+      this.$emit("node-click", data, node, nodeComp);
     },
     filterNode (value, data) {
       if (!value) return true;
@@ -264,6 +276,7 @@ export default create({
     },
     hide () {
       this.box = false;
+      this.node = {};
       this.$refs.form.resetForm();
       this.$refs.form.clearValidate();
     },
@@ -278,7 +291,7 @@ export default create({
         this.hide();
         done()
       };
-      this.$emit("save", data, callback, done);
+      this.$emit("save", this.node, data, callback, done);
     },
     update (data, done) {
       const callback = () => {
@@ -288,7 +301,7 @@ export default create({
         this.hide();
         done()
       };
-      this.$emit("update", data, callback, done);
+      this.$emit("update", this.node, data, callback, done);
     },
     rowEdit (a) {
       this.type = "edit";

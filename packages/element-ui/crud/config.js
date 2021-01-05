@@ -1,7 +1,6 @@
 // crud配置文件
 export default {
-  // 标题
-  sumText: '合 计',
+  clientHeight: document.documentElement.clientHeight,
   // 尺寸
   menuWidth: 240,
   menuFixed: 'right',
@@ -13,6 +12,7 @@ export default {
   cancelBtnIcon: 'el-icon-circle-close',
   viewBtnIcon: 'el-icon-view',
   editBtnIcon: 'el-icon-edit',
+  copyBtnIcon: 'el-icon-document-add',
   addBtnIcon: 'el-icon-plus',
   printBtnIcon: 'el-icon-printer',
   excelBtnIcon: 'el-icon-download',
@@ -27,6 +27,7 @@ export default {
   // 显隐
   viewBtn: false,
   editBtn: true,
+  copyBtn: false,
   cancelBtn: true,
   addBtn: true,
   addRowBtn: false,
@@ -47,6 +48,7 @@ export default {
   selectClearBtn: true,
   searchShow: true,
   tip: true,
+  dialogTop: '100',
   dialogHeight: 'auto',
   dialogWidth: '60%',
   dialogDrag: false,

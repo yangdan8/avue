@@ -1,20 +1,67 @@
 <template>
   <div :class="b()">
-    <avue-crud ref="crud"
+    <template v-if="isForm">
+      <div :class="b('header')">
+        <el-button size="mini"
+                   circle
+                   v-if="!readonly && !disabled && !addBtn"
+                   :disabled="disabled"
+                   type="primary"
+                   icon="el-icon-plus"
+                   @click="addRow"></el-button>
+      </div>
+      <div>
+        <div v-for="(item,index) in text"
+             :class="b('row')"
+             :key="index"
+             @mouseenter="cellMouseenter({$index:index})"
+             @mouseleave="cellMouseLeave({$index:index})">
+          <el-button v-if="!readonly && !disabled  && !delBtn && hoverList[index]"
+                     @click="delRow(item.$index)"
+                     type="danger"
+                     :class="b('menu')"
+                     size="mini"
+                     :disabled="disabled"
+                     icon="el-icon-delete"
+                     circle></el-button>
+          <avue-form :key="index"
+                     :option="option"
+                     v-model="text[index]">
+            <div slot-scope="{}"
+                 slot="_index">
+              <span>{{item.$index+1}}</span>
+            </div>
+            <template v-for="column in columnOption"
+                      slot-scope="scope"
+                      :slot="column.prop">
+              <slot :row="text[index]"
+                    :dic="scope.dic"
+                    :size="scope.size"
+                    :label="scope.label"
+                    :name="column.prop"></slot>
+            </template>
+          </avue-form>
+        </div>
+      </div>
+    </template>
+    <avue-crud v-else-if="isCrud"
+               ref="crud"
                :option="option"
+               :disabled="disabled"
+               @cell-mouse-enter="cellMouseenter"
+               @cell-mouse-leave="cellMouseLeave"
+               @selection-change="handleSelectionChange"
                :data="text">
       <template slot-scope="scope"
-                slot="index">
+                slot="_index">
         <el-button v-if="!readonly && !disabled  && !delBtn && hoverList[scope.row.$index]"
-                   @mouseout.native="mouseoutRow(scope.row.$index)"
                    @click="delRow(scope.row.$index)"
                    type="danger"
                    size="mini"
                    :disabled="disabled"
                    icon="el-icon-delete"
                    circle></el-button>
-        <span v-else
-              @mouseover="mouseoverRow(scope.row.$index)">{{scope.row.$index+1}}</span>
+        <div v-else>{{scope.row.$index+1}}</div>
       </template>
       <template v-for="(item,index) in columnOption"
                 slot-scope="scope"
@@ -42,12 +89,6 @@ export default create({
     }
   },
   props: {
-    readonly: {
-      type: Boolean,
-    },
-    disabled: {
-      type: Boolean,
-    },
     children: {
       type: Object,
       default: () => {
@@ -56,6 +97,21 @@ export default create({
     }
   },
   computed: {
+    showIndex () {
+      return this.vaildData(this.children.index, true)
+    },
+    showType () {
+      return this.children.type || 'crud'
+    },
+    isForm () {
+      return this.showType === 'form'
+    },
+    isCrud () {
+      return this.showType === 'crud'
+    },
+    selectionChange () {
+      return this.children.selectionChange
+    },
     rowAdd () {
       return this.children.rowAdd
     },
@@ -64,6 +120,9 @@ export default create({
     },
     viewBtn () {
       return this.children.viewBtn === false
+    },
+    addBtn () {
+      return this.children.addBtn === false
     },
     delBtn () {
       return this.children.delBtn === false
@@ -94,8 +153,10 @@ export default create({
         border: true,
         header: false,
         menu: false,
+        size: this.size,
         readonly: this.readonly,
-        disabled: this.disabled
+        emptyBtn: false,
+        submitBtn: false,
       }, (() => {
         let option = this.deepClone(this.children)
         delete option.column;
@@ -103,12 +164,17 @@ export default create({
       })(), (() => {
         let list = [{
           label: '#',
-          prop: 'index',
+          prop: '_index',
+          display: this.showIndex,
+          detail: true,
           fixed: true,
+          align: 'center',
+          headerAlign: 'center',
+          span: 24,
           width: 50,
           renderHeader: (h, { column, $index }) => {
-            if (this.option.addBtn === false || (this.readonly || this.disabled)) {
-              return '序号';
+            if (this.addBtn || this.readonly) {
+              return
             }
             return h('el-button', {
               attrs: {
@@ -123,13 +189,13 @@ export default create({
               }
             })
           },
-          slot: true
+          slot: true,
+          formslot: true
         }];
         this.columnOption.forEach(ele => {
           list.push(Object.assign(ele, {
-            cell: true,
-            slot: ele.formslot,
-            disabled: this.disabled || this.viewBtn
+            cell: this.vaildData(ele.cell, true),
+            slot: ele.formslot
           }))
         })
         return {
@@ -142,11 +208,25 @@ export default create({
     this.initData();
   },
   watch: {
+    textLen () {
+      return this.text.length;
+    },
     text () {
       this.initData();
     }
   },
   methods: {
+    handleSelectionChange (val) {
+      this.selectionChange && this.selectionChange(val);
+    },
+    cellMouseenter (row) {
+      let index = row.$index;
+      this.mouseoverRow(index);
+    },
+    cellMouseLeave (row, column, cell, event) {
+      let index = row.$index;
+      this.mouseoutRow(index)
+    },
     validate () {
       return new Promise(resolve => {
         let list = [];
@@ -163,9 +243,10 @@ export default create({
           list.push(callback())
         })
         Promise.all(list).then(error => {
-          let result = {}
+          let result;
           error.forEach((ele, index) => {
             if (!this.validatenull(ele)) {
+              if (!result) result = {}
               result[index] = ele
             }
           })
@@ -177,6 +258,7 @@ export default create({
       this.text.forEach((ele, index) => {
         ele = Object.assign(ele, {
           $cellEdit: true,
+          $index: index,
         })
       })
     },
@@ -197,19 +279,26 @@ export default create({
     },
     delRow (index) {
       const callback = () => {
-        this.text.splice(index, 1);
+        let list = this.deepClone(this.text)
+        list.splice(index, 1);
+        this.text = list;
       }
-      const row = this.text[index]
       if (typeof this.rowDel === 'function') {
-        this.rowDel(row, callback);
+        this.rowDel(this.text[index], callback);
       } else {
         callback();
       }
     },
     addRow () {
       const callback = (obj = {}) => {
-        obj = Object.assign(this.valueOption, obj);
-        this.$refs.crud.rowCellAdd(obj);
+        obj = Object.assign(this.valueOption, obj, {
+          $index: this.textLen
+        });
+        if (this.isCrud) {
+          this.$refs.crud.rowCellAdd(obj);
+        } else if (this.isForm) {
+          this.text.push(obj)
+        }
       }
       if (typeof this.rowAdd === 'function') {
         this.rowAdd(callback);

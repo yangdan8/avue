@@ -31,10 +31,11 @@ $space-width: 15px;
     height: auto;
     overflow: hidden;
     margin-bottom: 5px;
+    background-color: #fff;
   }
   &__search{
     .el-form-item--mini.el-form-item, .el-form-item--small.el-form-item{
-      margin-bottom: 8px;
+      margin-bottom: 14px;
     }
   }
   .el-table--mini{
@@ -42,8 +43,8 @@ $space-width: 15px;
       width: 20px;
       height: 20px;
     }
-    .avue-crud__icon-select{
-      font-size: 22px;
+    .avue-crud__icon{
+      font-size: 20px;
     }
   }
   .el-table--small{
@@ -51,8 +52,8 @@ $space-width: 15px;
       width: 30px;
       height: 30px;
     }
-    .avue-crud__icon-select{
-      font-size: 22px;
+    .avue-crud__icon{
+      font-size: 30px;
     }
   }
   margin: 0 auto;
@@ -133,13 +134,17 @@ $space-width: 15px;
     background-color: #fafafa;
   }
   &__color{
+    margin: 0 auto;
     width: 40px;
     height: 40px;
     border-radius: 5px;
     display: block;
   }
-  &__icon-select{
-    font-size: 28px;
+  &__icon{
+    font-size: 45px;
+    &--small{
+      font-size: 20px;
+    }
   }
   &__sortable{
     opacity: 0.2;
@@ -149,9 +154,7 @@ $space-width: 15px;
   }
   &__pagination {
     position: relative;
-    margin-top: 15px;
-    margin-bottom: 10px;
-    padding: 10px 20px;
+    padding: 25px 0 20px 20px;
     text-align: right;
   }
   &__form {
@@ -198,7 +201,7 @@ $space-width: 15px;
       justify-content: center;
     }
     &-menu {
-      padding: 0 38px;
+      padding: 0 5px;
       margin-bottom: 20px;
     }
     &-label {
@@ -233,7 +236,6 @@ $space-width: 15px;
       justify-content: space-between;
     }
     &__menu{
-      padding-top: 1px;
       padding-right: 20px;
       i{
         color: #909399;
@@ -244,11 +246,12 @@ $space-width: 15px;
       }
     }
     .el-transfer{
+      position: relative;
       padding: 0 20px;
-      height:96%;
+      height:80%;
     }
     .el-transfer-panel__body,.el-transfer-panel__list.is-filterable{
-      height:100% !important;
+      height:90% !important;
     }
     .el-transfer__buttons{
       display: flex;

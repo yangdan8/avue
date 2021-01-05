@@ -1,10 +1,10 @@
-import { initVal } from 'core/dataformat';
-import { DIC_PROPS, DIC_HTTP_PROPS } from 'global/variable';
+import { DIC_PROPS, DIC_SPLIT, DIC_HTTP_PROPS } from 'global/variable';
 export default function () {
 
   return {
     data () {
       return {
+        stringMode: false,
         name: '',
         text: undefined,
         propsHttpDefault: DIC_HTTP_PROPS,
@@ -21,6 +21,10 @@ export default function () {
         type: Boolean,
         default: false
       },
+      separator: {
+        type: String,
+        default: DIC_SPLIT
+      },
       formslot: {
         type: Boolean,
         default: false
@@ -33,12 +37,13 @@ export default function () {
       },
       listType: {
         type: String,
-        default: 'text'
       },
       value: {},
       column: {
         type: Object,
-        default: () => { }
+        default: () => {
+          return {}
+        }
       },
       typeslot: {
         type: Boolean,
@@ -143,11 +148,15 @@ export default function () {
       }
     },
     watch: {
+      text: {
+        handler (n, o) {
+          this.handleChange(n)
+        }
+      },
       value: {
-        handler (val) {
+        handler (n, o) {
           this.initVal();
-        },
-        immediate: true
+        }
       }
     },
     computed: {
@@ -199,16 +208,8 @@ export default function () {
         return this.props.id || this.propsDefault.id;
       }
     },
-    methods: {
-      initVal () {
-        this.text = initVal({
-          type: this.type,
-          listType: this.listType,
-          multiple: this.multiple,
-          dataType: this.dataType,
-          value: this.value
-        });
-      }
+    created () {
+      this.initVal();
     }
   };
 }

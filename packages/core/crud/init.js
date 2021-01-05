@@ -1,6 +1,5 @@
 import { loadDic, loadCascaderDic } from 'core/dic';
-export default function (type) {
-  const isCrud = type === 'crud'
+export default function () {
   return {
     props: {
       option: {
@@ -16,20 +15,13 @@ export default function (type) {
         handler () {
           this.init();
         },
-        deep: true
-      },
-      //检测本地字典随时赋值
-      'option.dicData': {
-        handler (val) {
-          this.DIC = Object.assign(this.DIC, val);
-        },
         deep: true,
-        immediate: true
-      },
+      }
     },
     data () {
       return {
         DIC: {},
+        dicCreate: false,
         cascaderDIC: {},
         tableOption: {},
         isMobile: ''
@@ -39,6 +31,11 @@ export default function (type) {
       this.init();
     },
     computed: {
+      resultOption () {
+        return Object.assign(this.deepClone(this.tableOption), {
+          column: this.propOption
+        })
+      },
       formRules () {
         let result = {};
         this.propOption.forEach(ele => {
@@ -58,69 +55,34 @@ export default function (type) {
       }
     },
     methods: {
-      getKey (item = {}, props = {}, key) {
-        return item[
-          props[key] || (this.parentOption.props || {})[key] || key
-        ];
+      init () {
+        this.tableOption = this.option;
+        this.getIsMobile();
+        this.handleLoadDic().then(() => {
+          this.forEachLabel && this.forEachLabel()
+        });
       },
       getIsMobile () {
         this.isMobile = window.document.body.clientWidth <= 768;
       },
-      init () {
-        this.tableOption = this.option;
-        this.getIsMobile();
-        window.onresize = () => {
-          this.getIsMobile();
-        };
-        setTimeout(() => {
-          this.initDic();
-        }, 0);
-      },
-      //检测本地字典
-      initDic () {
-        if (isCrud) {
-          // 表格赋值
-          this.propOption.forEach(ele => {
-            if (Array.isArray(ele.dicData)) {
-              this.$set(this.DIC, ele.prop, ele.dicData)
-            }
-          })
-        } else {
-          //表单赋值
-          this.columnOption.forEach(ele => {
-            (ele.column || []).forEach(item => {
-              if (Array.isArray(item.dicData)) {
-                this.$set(this.DIC, item.prop, item.dicData)
-              }
-            })
-          })
-        }
-      },
-      // 加载字典
-      handleLoadDic (option) {
+      // 网络字典加载
+      handleLoadDic () {
         return new Promise((resolve) => {
-          const dicFlag = this.vaildData(this.tableOption.dicFlag, true);
-          // 初始化字典
-          if (dicFlag) {
-            loadDic(option || this.tableOption).then((res = {}) => {
-              Object.keys(res).forEach(ele => {
-                this.$set(this.DIC, ele, res[ele])
-              });
-              resolve();
+          loadDic(this.resultOption, this.dicCreate).then((res = {}) => {
+            Object.keys(res).forEach(ele => {
+              this.$set(this.DIC, ele, res[ele])
             });
-          }
-          resolve();
+            this.dicCreate = true;
+            resolve();
+          });
         })
       },
-      handleLoadCascaderDic (option, data) {
-        loadCascaderDic(option || (isCrud ? this.propOption : this.columnOption), this.data || [data]).then(res => {
-          if (option) {
-            Object.keys(res).forEach(ele => {
-              this.$set(this.cascaderDIC, ele, res)
-            });
-          } else {
-            this.cascaderDIC = this.deepClone(res);
-          }
+      //级联字典加载
+      handleLoadCascaderDic () {
+        loadCascaderDic(this.propOption, this.data).then(res => {
+          Object.keys(res).forEach(ele => {
+            this.$set(this.cascaderDIC, ele, res[ele])
+          });
         });
       }
     }

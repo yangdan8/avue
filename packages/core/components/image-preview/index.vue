@@ -19,28 +19,34 @@
     <div :class="b('box')"
          ref="box"
          :style="styleBoxName">
-      <el-carousel ref="carousel"
-                   :initial-index="index"
-                   :interval="0"
-                   arrow="never"
-                   @change="handleChange"
-                   indicator-position="none"
-                   :height="height">
-        <el-carousel-item v-for="(item,index) in datas"
-                          :key="index">
+      <component :is="carouselName"
+                 ref="carousel"
+                 :show-indicators="false"
+                 :initial-index="index"
+                 :initial-swipe="index"
+                 :interval="0"
+                 arrow="never"
+                 @change="handleChange"
+                 indicator-position="none"
+                 :height="height">
+        <component :is="carouselItemName"
+                   v-for="(item,index) in datas"
+                   :key="index">
           <img :src="item.url"
                :style="styleName"
                @mousedown="move"
+               controls="controls"
+               v-bind="getIsVideo(item)"
                ondragstart="return false"></img>
-        </el-carousel-item>
-      </el-carousel>
+        </component>
+      </component>
     </div>
     <div class="el-image-viewer__btn el-image-viewer__actions">
       <div class="el-image-viewer__actions__inner">
         <i class="el-icon-zoom-out"
-           @click="scale=scale-0.2"></i>
+           @click="subScale"></i>
         <i class="el-icon-zoom-in"
-           @click="scale=scale+0.2"></i>
+           @click="addScale"></i>
         <!-- <i class="el-image-viewer__actions__divider"></i> -->
         <!-- <i class="el-icon-full-screen"></i> -->
         <!-- <i class="el-image-viewer__actions__divider"></i> -->
@@ -69,6 +75,14 @@ export default create({
     };
   },
   computed: {
+    carouselName () {
+      if (this.$isVan) return `${this.$AVUE.ui.type}Swipe`
+      return `${this.$AVUE.ui.type}Carousel`
+    },
+    carouselItemName () {
+      if (this.$isVan) return `${this.$AVUE.ui.type}SwipeItem`
+      return `${this.$AVUE.ui.type}CarouselItem`
+    },
     styleBoxName () {
       return {
         marginLeft: this.setPx(this.left),
@@ -93,6 +107,20 @@ export default create({
     }
   },
   methods: {
+    getIsVideo (item) {
+      if (this.$typeList.video.test(item.url) || item.type == 'video') {
+        return { is: 'video' }
+      }
+      return {}
+    },
+    subScale () {
+      if (this.scale != 0.2) {
+        this.scale = parseFloat((this.scale - 0.2).toFixed(2))
+      }
+    },
+    addScale () {
+      this.scale = parseFloat((this.scale + 0.2).toFixed(2))
+    },
     handleChange () {
       this.scale = 1;
       this.rotate = 0;

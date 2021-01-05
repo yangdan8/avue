@@ -1,17 +1,17 @@
 <template>
-  <div class="avue-cell">
+  <div>
     <van-field v-model="textLabel"
                :placeholder="placeholder"
                :disabled="disabled"
                :clearable="clearable"
                :left-icon="prefixIcon"
-               is-link
-               input-align="right"
+               :rules="rules"
+               :input-align="inputAlign"
                :required="required"
                @click.native="handleSelectClick"
                readonly
                :icon="suffixIcon"
-               :label="label" />
+               :label="label"></van-field>
     <van-popup v-model="box"
                position="bottom">
       <van-picker ref="picker"
@@ -19,7 +19,7 @@
                   :title="label"
                   :columns="columns"
                   @cancel="handleCancel"
-                  @confirm="handleConfirm" />
+                  @confirm="handleConfirm"></van-picker>
     </van-popup>
   </div>
 </template>
@@ -48,7 +48,7 @@ export default create({
       default: 4
     }
   },
-  data() {
+  data () {
     return {
       box: false,
       textLabel: "",
@@ -57,66 +57,68 @@ export default create({
   },
   watch: {
     value: {
-      handler() {
-        this.initVal();
+      handler () {
         this.init();
       },
       immediate: true
     },
-    dic() {
+    dic () {
       this.init();
     },
-    box() {
+    box () {
       if (this.box) {
         this.$nextTick(() => {
           this.$refs.picker.setIndexes([this.textIndex]);
         });
       }
     },
-    text() {
+    text () {
       this.handleChange(this.value);
     }
   },
   computed: {
-    columns() {
+    columns () {
       let list = this.dic.map(ele =>
         Object.assign({ text: ele[this.labelKey] }, ele)
       );
       return list;
     }
   },
-  created() {},
-  mounted() {
+  created () { },
+  mounted () {
     this.init();
   },
   methods: {
-    handleSelectClick() {
+    handleSelectClick () {
       if (this.disabled) return;
       this.show();
       this.handleClick();
     },
-    handleConfirm(value, index) {
+    handleConfirm (value, index) {
       const dicObj = this.dic[index];
       this.text = dicObj[this.valueKey];
       this.textLabel = dicObj[this.labelKey];
       this.handleChange(this.text);
       this.hide();
     },
-    show() {
+    show () {
       this.box = true;
     },
-    hide() {
+    hide () {
       this.box = false;
     },
-    handleCancel() {
+    handleCancel () {
       this.hide();
     },
-    init() {
+    init () {
       if (!this.validatenull(this.text)) {
-        this.textLabel = findByValue(this.dic, this.text, this.props, true);
+        this.textLabel = findByValue(this.dic, this.text, this.props, true, this.column);
         this.textIndex = this.columns.findIndex(
           ele => ele.text === this.textLabel
         );
+      } else {
+        this.textLabel = '';
+        this.textIndex = -1;
       }
     }
   }

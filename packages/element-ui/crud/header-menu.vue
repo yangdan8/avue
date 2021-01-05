@@ -6,26 +6,41 @@
                  :icon="config.addBtnIcon"
                  :size="crud.isMediumSize"
                  v-permission="crud.getPermission('addBtn')"
-                 v-if="vaildData(crud.tableOption.addBtn,config.addBtn)">{{crud.menuIcon('addBtn')}}</el-button>
+                 v-if="vaildData(crud.tableOption.addBtn,config.addBtn)">
+        <template v-if="!crud.isIconMenu">
+          {{crud.menuIcon('addBtn')}}
+        </template>
+      </el-button>
       <el-button type="primary"
                  @click="crud.rowCellAdd"
                  :icon="config.addBtnIcon"
                  v-permission="crud.getPermission('addRowBtn')"
                  :size="crud.isMediumSize"
-                 v-if="vaildData(crud.tableOption.addRowBtn,config.addRowBtn)">{{crud.menuIcon('addBtn')}}</el-button>
-
+                 v-if="vaildData(crud.tableOption.addRowBtn,config.addRowBtn)">
+        <template v-if="!crud.isIconMenu">
+          {{crud.menuIcon('addBtn')}}
+        </template>
+      </el-button>
       <el-button type="primary"
                  @click="rowPrint"
                  :icon="config.printBtnIcon"
                  v-permission="crud.getPermission('printBtn')"
                  :size="crud.isMediumSize"
-                 v-if="vaildData(crud.tableOption.printBtn,config.printBtn)">{{crud.menuIcon('printBtn')}}</el-button>
+                 v-if="vaildData(crud.tableOption.printBtn,config.printBtn)">
+        <template v-if="!crud.isIconMenu">
+          {{crud.menuIcon('printBtn')}}
+        </template>
+      </el-button>
       <el-button type="primary"
                  @click="rowExcel"
                  :icon="config.excelBtnIcon"
                  v-permission="crud.getPermission('excelBtn')"
                  :size="crud.isMediumSize"
-                 v-if="vaildData(crud.tableOption.excelBtn,config.excelBtn)">{{crud.menuIcon('excelBtn')}}</el-button>
+                 v-if="vaildData(crud.tableOption.excelBtn,config.excelBtn)">
+        <template v-if="!crud.isIconMenu">
+          {{crud.menuIcon('excelBtn')}}
+        </template>
+      </el-button>
       <slot name="menuLeft"></slot>
     </div>
     <div :class="b('right')">
@@ -88,7 +103,7 @@ import create from "core/create";
 import config from "./config";
 import packages from "core/packages";
 import { dateFtt } from 'utils/date'
-import { vaildData } from "utils/util";
+import { vaildData, getAsVal } from "utils/util";
 export default create({
   name: "crud",
   mixins: [locale],
@@ -98,6 +113,7 @@ export default create({
   inject: ["crud"],
   data () {
     return {
+      dateCreate: false,
       pickerOptions: {
         shortcuts: [{
           text: '今日',
@@ -163,7 +179,12 @@ export default create({
   methods: {
     //日期组件回调
     dateChange (val) {
-      this.crud.$emit("date-change", val);
+      if (this.dateCreate) {
+        this.crud.$emit("date-change", val);
+      } else {
+        this.dateCreate = true;
+      }
+
     },
     initFun () {
       this.vaildData = vaildData;
@@ -211,8 +232,17 @@ export default create({
       const option = this.crud.tableOption;
       const columnOption = this.crud.propOption;
       let count = 0;
-      let data = [...this.data];
       let sumsList = [...this.crud.sumsList];
+      let data = []
+      this.data.forEach(ele => {
+        let obj = this.deepClone(ele);
+        columnOption.forEach(column => {
+          if (column.bind) {
+            obj[column.prop] = getAsVal(obj, column.bind);
+          }
+        })
+        data.push(obj);
+      })
       if (option.index) count++;
       if (option.selection) count++;
       if (option.expand) count++;

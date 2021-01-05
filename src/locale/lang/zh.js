@@ -8,6 +8,10 @@ export default {
     select: '请选择',
     input: '请输入'
   },
+  upload: {
+    upload: '点击上传',
+    tip: '将文件拖到此处，或'
+  },
   date: {
     start: '开始日期',
     end: '结束日期',
@@ -24,6 +28,11 @@ export default {
     empty: '清 空'
   },
   crud: {
+    summary: {
+      count: '计数:',
+      avg: '平均:',
+      sum: '合计:'
+    },
     filter: {
       addBtn: '新增条件',
       clearBtn: '清空数据',
@@ -34,12 +43,15 @@ export default {
     tipStartTitle: '当前表格已选择',
     tipEndTitle: '项',
     editTitle: '编 辑',
+    copyTitle: '复 制',
     addTitle: '新 增',
     viewTitle: '查 看',
     filterTitle: '过滤条件',
     showTitle: '列显隐',
     menu: '操作',
     addBtn: '新 增',
+    show: '显 示',
+    hide: '隐 藏',
     showBtn: '显 隐',
     filterBtn: '过 滤',
     refreshBtn: '刷 新',
@@ -53,6 +65,7 @@ export default {
     saveBtn: '保 存',
     viewBtn: '查 看',
     editBtn: '编 辑',
+    copyBtn: '复 制',
     delBtn: '删 除'
   }
 }

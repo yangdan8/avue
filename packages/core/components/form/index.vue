@@ -1,22 +1,18 @@
 <template>
   <component :is="getComponent(column.type,column.component)"
              v-model="text"
-             v-bind="column"
+             v-bind="Object.assign(column,$uploadFun(column))"
+             v-on="event"
              :column="Object.assign(column,params)"
              :dic="dic"
              ref="temp"
-             :disabled="disabled"
-             :readonly="readonly"
+             :disabled="column.disabled || disabled"
+             :readonly="column.readonly || readonly"
              :placeholder="getPlaceholder(column)"
              :props="column.props || props"
              :propsHttp="column.propsHttp || propsHttp"
              :size="column.size || size"
              :type="type || column.type"
-             :upload-preview="uploadPreview"
-             :upload-before="uploadBefore"
-             :upload-after="uploadAfter"
-             :upload-delete="uploadDelete"
-             :upload-error="uploadError"
              @keyup.enter.native="enterChange"
              @change="handleChange">
     <span v-if="params.html"
@@ -56,6 +52,7 @@ export default {
     uploadAfter: Function,
     uploadPreview: Function,
     uploadError: Function,
+    uploadExceed: Function,
     props: {
       type: Object
     },
@@ -109,6 +106,9 @@ export default {
   computed: {
     params () {
       return this.column.params || {}
+    },
+    event () {
+      return this.column.event || {}
     },
     columnOption () {
       return ((this.column.children || []).column) || []

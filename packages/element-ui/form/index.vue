@@ -2,12 +2,12 @@
   <div :class="[b(),{'avue--view':isView,'avue--detail':isDetail}]"
        :style="{width:setPx(parentOption.formWidth,'100%')}">
     <el-form ref="form"
-             status-icon
+             :status-icon="parentOption.statusIcon"
              @submit.native.prevent
              :model="form"
              :label-suffix="parentOption.labelSuffix || ':'"
-             :label-position="parentOption.labelPosition"
              :size="$AVUE.formSize || controlSize"
+             :label-position="parentOption.labelPosition"
              :label-width="setPx(parentOption.labelWidth,labelWidth)"
              :rules="formRules">
       <el-row :span="24"
@@ -26,22 +26,24 @@
                     :label="item.label">
           <el-tabs slot="tabs"
                    v-model="activeName"
+                   @tab-click="handleTabClick"
                    :class="b('tabs')"
                    :type="tabsType"
                    v-if="isTabs&&index == 1">
-            <el-tab-pane v-for="(item,index) in columnOption"
-                         v-if="!item.display && index!=0"
-                         :key="index"
-                         :name="index+''">
-              <span slot="label">
-                <slot :name="item.prop+'Header'"
-                      v-if="$slots[item.prop+'Header']"></slot>
-                <template v-else>
-                  <i :class="item.icon">&nbsp;</i>
-                  {{item.label}}
-                </template>
-              </span>
-            </el-tab-pane>
+            <template v-for="(item,index) in columnOption">
+              <el-tab-pane v-if="vaildData(item.display,true) && index!=0"
+                           :key="index"
+                           :name="index+''">
+                <span slot="label">
+                  <slot :name="item.prop+'Header'"
+                        v-if="$slots[item.prop+'Header']"></slot>
+                  <template v-else>
+                    <i :class="item.icon">&nbsp;</i>
+                    {{item.label}}
+                  </template>
+                </span>
+              </el-tab-pane>
+            </template>
           </el-tabs>
           <template slot="header"
                     v-if="$slots[item.prop+'Header']">
@@ -49,20 +51,20 @@
           </template>
           <div :class="b('group',{'flex':vaildData(item.flex,true)})"
                v-show="isGroupShow(item,index)">
-            <template v-if="vaildDisplay(column)"
-                      v-for="(column,cindex) in item.column">
-              <el-col :key="column.prop"
+            <template v-for="(column,cindex) in item.column">
+              <el-col v-if="vaildDisplay(column)"
+                      :key="cindex"
                       :style="{paddingLeft:setPx((parentOption.gutter ||20)/2),paddingRight:setPx((parentOption.gutter ||20)/2)}"
                       :span="getSpan(column)"
                       :md="getSpan(column)"
                       :sm="12"
                       :xs="24"
                       :offset="column.offset || 0"
-                      :class="[b('row'),{'avue--detail':vaildDetail(column)}]">
+                      :class="[b('row'),{'avue--detail':vaildDetail(column)},column.className]">
                 <el-form-item :prop="column.prop"
                               :label="column.label"
-                              :class="b('item--'+(column.labelPosition ||item.labelPosition || ''))"
-                              :label-position="column.labelPosition"
+                              :class="b('item--'+(column.labelPosition || item.labelPosition || ''))"
+                              :label-position="column.labelPosition || item.labelPosition || parentOption.labelPosition"
                               :label-width="getLabelWidth(column,item)">
                   <template slot="label"
                             v-if="column.labelslot">
@@ -86,7 +88,6 @@
                           :size="column.size || controlSize"
                           :dic="DIC[column.prop]"></slot>
                   </template>
-
                   <el-tooltip :disabled="!column.tip || column.type==='upload'"
                               :content="vaildData(column.tip,getPlaceholder(column))"
                               :placement="column.tipPlacement">
@@ -106,17 +107,13 @@
                                :t="t"
                                :props="parentOption.props"
                                :propsHttp="parentOption.propsHttp"
-                               :upload-before="uploadBefore"
-                               :upload-after="uploadAfter"
-                               :upload-delete="uploadDelete"
-                               :upload-preview="uploadPreview"
-                               :upload-error="uploadError"
-                               :readonly="readonly || column.readonly"
+                               v-bind="$uploadFun(column)"
                                :disabled="getDisabled(column)"
-                               v-model="form[column.prop]"
                                :enter="parentOption.enter"
+                               :size="parentOption.size"
+                               v-model="form[column.prop]"
                                @enter="submit"
-                               @change="column.cascader && handleChange(item.column,column)">
+                               @change="propChange(item.column,column)">
                       <template :slot="citem.prop"
                                 slot-scope="scope"
                                 v-for="citem in ((column.children || {}).column || [])">
@@ -142,9 +139,9 @@
                 </el-form-item>
               </el-col>
               <div :class="b('line')"
-                   :key="cindex"
-                   :style="{width:(column.count/24*100)+'%'}"
-                   v-if="column.row && column.span!==24 && column.count"></div>
+                   v-if="vaildDisplay(column)&&column.row && column.span!==24 && column.count"
+                   :key="`line${cindex}`"
+                   :style="{width:(column.count/24*100)+'%'}"></div>
             </template>
             <slot name="search"></slot>
             <form-menu v-if="!isDetail && !isMenu">
@@ -173,11 +170,12 @@
 import locale from "../../core/common/locale";
 import { detail } from "core/detail";
 import create from "core/create";
-import init from "../../core/crud/init";
+import init from "../../core/common/init";
 import formTemp from '../../core/components/form/index'
+import { DIC_PROPS } from 'global/variable';
 import { getComponent, getPlaceholder, formInitVal, calcCount, calcCascader } from "core/dataformat";
 import { sendDic } from "core/dic";
-import { filterDefaultParams, clearVal } from 'utils/util'
+import { filterDefaultParams, clearVal, getAsVal, setAsVal } from 'utils/util'
 import mock from "utils/mock";
 import formMenu from './menu'
 export default create({
@@ -189,18 +187,19 @@ export default create({
   },
   data () {
     return {
-      activeName: '1',
+      activeName: '',
       labelWidth: 90,
       allDisabled: false,
       optionIndex: [],
       optionBox: false,
       tableOption: {},
       itemSpanDefault: 12,
-      formOld: {},
+      bindList: {},
       form: {},
       formList: [],
-      formCreate: true,
-      formDefault: {}
+      formCreate: false,
+      formDefault: {},
+      formVal: {}
     };
   },
   provide () {
@@ -209,25 +208,34 @@ export default create({
     };
   },
   watch: {
-    form: {
+    tabsActive: {
+      handler (val) {
+        this.activeName = this.tabsActive
+      },
+      immediate: true
+    },
+    formRules: {
       handler () {
-        if (!this.formCreate) {
-          this.$emit("input", this.form);
-          this.$emit("change", this.form);
-        } else {
-          this.formCreate = false;
-        }
+        this.clearValidate();
+      },
+      deep: true
+    },
+    form: {
+      handler (val) {
+        if (this.formCreate) this.setVal();
       },
       deep: true
     },
     value: {
-      handler () {
-        this.formOld = this.deepClone(this.value);
-        if (!this.formCreate) {
-          this.formVal();
+      handler (val) {
+        if (this.formCreate) {
+          this.setForm(val);
+        } else {
+          this.formVal = Object.assign(this.formVal, val || {});
         }
       },
-      deep: true
+      deep: true,
+      immediate: true
     }
   },
   computed: {
@@ -264,15 +272,11 @@ export default create({
     dynamicOption () {
       let list = []
       this.propOption.forEach(ele => {
-        if (ele.type == 'dynamic') list.push(ele)
+        if (ele.type == 'dynamic' && this.vaildDisplay(ele)) {
+          list.push(ele)
+        }
       })
       return list
-    },
-    dicOption () {
-      return {
-        dicData: this.tableOption.dicData,
-        column: this.propOption
-      }
     },
     propOption () {
       let list = [];
@@ -292,6 +296,7 @@ export default create({
       if (group) {
         //处理分组以外的部分
         group.unshift({
+          arrow: false,
           column: option.column
         })
       }
@@ -310,6 +315,10 @@ export default create({
         });
         //处理级联属性
         ele.column = calcCascader(ele.column);
+        //根据order排序
+        ele.column = ele.column.sort((a, b) => {
+          return (b.order || 0) - (a.order || 0)
+        })
       });;
       return list;
     },
@@ -326,6 +335,9 @@ export default create({
     isPrint () {
       return this.vaildData(this.parentOption.printBtn, false)
     },
+    tabsActive () {
+      return this.vaildData(this.tableOption.tabsActive + '', '1')
+    },
     isMock () {
       return this.vaildData(this.parentOption.mockBtn, false);
     }
@@ -336,6 +348,11 @@ export default create({
     uploadDelete: Function,
     uploadPreview: Function,
     uploadError: Function,
+    uploadExceed: Function,
+    reset: {
+      type: Boolean,
+      default: true
+    },
     value: {
       type: Object,
       required: true,
@@ -345,21 +362,18 @@ export default create({
     }
   },
   created () {
-    //初始化字典
-    this.dataDic()
-    // 初始化表单
-    this.dataFormat();
+    this.$nextTick(() => {
+      this.dataFormat();
+      this.setVal();
+      this.clearValidate();
+      this.formCreate = true;
+    })
   },
   methods: {
     getComponent,
     getPlaceholder,
     getDisabled (column) {
       return this.vaildDetail(column) || this.isDetail || this.vaildDisabled(column) || this.allDisabled
-    },
-    dataDic () {
-      this.handleLoadDic(this.dicOption).then(() => {
-        this.forEachLabel()
-      });
     },
     getSpan (column) {
       return column.span || this.parentOption.span || this.itemSpanDefault
@@ -372,19 +386,18 @@ export default create({
       }
     },
     forEachLabel () {
-      this.columnOption.forEach(ele => {
-        ele.column.forEach(column => {
-          setTimeout(() => {
-            this.handleShowLabel(column, this.DIC[column.prop]);
-          }, 0)
-        });
+      this.propOption.forEach(column => {
+        this.handleShowLabel(column, this.DIC[column.prop]);
       });
+    },
+    handleTabClick (tab, event) {
+      this.$emit('tab-click', tab, event)
     },
     getLabelWidth (column, item) {
       let result;
       if (!this.validatenull(column.labelWidth)) {
         result = column.labelWidth
-      } else if (!this.validatenull(column.labelWidth)) {
+      } else if (!this.validatenull(item.labelWidth)) {
         result = item.labelWidth
       } else {
         result = this.parentOption.labelWidth;
@@ -404,82 +417,93 @@ export default create({
     validateField (val) {
       return this.$refs.form.validateField(val);
     },
-    updateDic (prop, list) {
-      const column = this.findObject(this.columnOption, prop);
-      if (this.validatenull(list) && !this.validatenull(column.dicUrl)) {
-        sendDic({
-          url: column.dicUrl,
-          method: column.dicMethod,
-          query: column.dicQuery,
-          resKey: (column.props || {}).res,
-          formatter: column.dicFormatter
-        }).then(list => {
-          this.$set(this.DIC, prop, list);
-        });
-      } else {
-        this.$set(this.DIC, prop, list);
-      }
+    getPropRef (prop) {
+      return this.$refs[prop][0];
     },
+    //初始化表单
     dataFormat () {
-      let formDefault = formInitVal(this.propOption);
-      this.formDefault = formDefault;
-      this.form = this.deepClone(formDefault.tableForm);
-      this.formVal();
+      this.formDefault = formInitVal(this.propOption);
+      let value = this.deepClone(this.formDefault.tableForm);
+      this.setForm(this.deepClone(Object.assign(value, this.formVal)))
     },
-
-    handleChange (list, column) {
-      const cascader = column.cascader;
-      const str = cascader.join(",");
-      const columnNextProp = cascader[0];
-      const value = this.form[column.prop];
-      // 下一个节点
-      const columnNext = this.findObject(list, columnNextProp)
-      /**
-       * 1.判断当前节点是否有下级节点
-       * 2.判断当前节点是否有值
-       */
-      if (
-        this.validatenull(cascader) ||
-        this.validatenull(value) ||
-        this.validatenull(columnNext)
-      ) {
-        return;
-      }
-
-      // 如果不是首次加载则清空全部关联节点的属性值和字典值
-      if (this.formList.includes(str)) {
-        //清空子类字典列表和值
-        cascader.forEach(ele => {
-          this.form[ele] = "";
-          this.$set(this.DIC, ele, []);
-        });
-      }
-      // 根据当前节点值获取下一个节点的字典
-      sendDic({
-        url: (columnNext.dicUrl || '').replace("{{key}}", value),
-        method: columnNext.dicMethod,
-        query: columnNext.dicQuery,
-        formatter: columnNext.dicFormatter,
-        resKey: (columnNext.props || {}).res,
-      }).then(res => {
-        const dic = Array.isArray(res) ? res : [];
-        //首次加载的放入队列记录
-        if (!this.formList.includes(str)) this.formList.push(str);
-        // 修改字典
-        this.$set(this.DIC, columnNextProp, dic);
-      });
+    setVal () {
+      this.$emit("input", this.form);
+      this.$emit("change", this.form);
     },
-    formVal () {
-      Object.keys(this.value).forEach(ele => {
-        this.$set(this.form, ele, this.value[ele]);
+    //表单赋值
+    setForm (value) {
+      Object.keys(value).forEach(ele => {
+        let result = value[ele];
+        let column = this.propOption.find(column => column.prop == ele)
+        this.$set(this.form, ele, result);
+        if (!column) return
+        let prop = column.prop
+        let bind = column.bind
+        if (bind && !this.bindList[prop]) {
+          this.$watch('form.' + prop, (n, o) => {
+            if (n != o) setAsVal(this.form, bind, n);
+          })
+          this.$watch('form.' + bind, (n, o) => {
+            if (n != o) this.$set(this.form, prop, n);
+          })
+          this.$set(this.form, prop, eval('value.' + bind));
+          this.bindList[prop] = true;
+        }
       });
       this.forEachLabel();
-      this.$emit("input", this.form);
+    },
+    handleChange (list, column) {
+      this.$nextTick(() => {
+        const cascader = column.cascader;
+        const str = cascader.join(",");
+        const columnNextProp = cascader[0];
+        const value = this.form[column.prop];
+        // 下一个节点
+        const columnNext = this.findObject(list, columnNextProp)
+        /**
+         * 1.判断当前节点是否有下级节点
+         * 2.判断当前节点是否有值
+         */
+        if (
+          this.validatenull(cascader) ||
+          this.validatenull(value) ||
+          this.validatenull(columnNext)
+        ) {
+          return;
+        }
+
+        // 如果不是首次加载则清空全部关联节点的属性值和字典值
+        if (this.formList.includes(str)) {
+          //清空子类字典列表和值
+          cascader.forEach(ele => {
+            this.form[ele] = "";
+            this.$set(this.DIC, ele, []);
+          });
+        }
+        // 根据当前节点值获取下一个节点的字典
+        sendDic({
+          column: columnNext,
+          value: value,
+          form: this.form
+        }).then(res => {
+          //首次加载的放入队列记录
+          if (!this.formList.includes(str)) this.formList.push(str);
+          // 修改字典
+          const dic = Array.isArray(res) ? res : [];
+          this.$set(this.DIC, columnNextProp, dic);
+          if (!this.validatenull(dic) && !this.validatenull(columnNext.cascaderIndex) && this.validatenull(this.form[columnNextProp])) {
+            this.form[columnNextProp] = dic[columnNext.cascaderIndex][(columnNext.props || {}).value || DIC_PROPS.value]
+          }
+        });
+      })
     },
     handlePrint () {
       this.$Print({
         html: this.$el.innerHTML
       });
+    },
+    propChange (option, column) {
+      if (column.cascader) this.handleChange(option, column)
     },
     handleMock () {
       if (this.isMock) {
@@ -538,59 +562,24 @@ export default create({
         return true;
       }
     },
-    clearValidate () {
-      this.$refs.form.clearValidate();
-    },
-    validate () {
-      return new Promise((resolve, reject) => {
-        this.$refs.form.validate(valid => {
-          if (valid) {
-            resolve();
-          } else {
-            reject();
-          }
-        });
-      });
-    },
-    resetForm () {
-      this.resetFields();
-      this.clearValidate();
-      this.clearVal();
-      this.$emit("input", this.form);
-      this.$emit("reset-change");
-    },
-    clearVal () {
-      this.form = clearVal(this.form)
-    },
-    resetFields () {
-      this.$refs.form.resetFields();
+    clearValidate (list) {
+      this.$nextTick(() => {
+        this.$refs.form.clearValidate(list);
+      })
     },
     validate (callback) {
-      this.$refs["form"].validate(valid => callback(valid));
-    },
-    show () {
-      this.allDisabled = true;
-    },
-    hide () {
-      this.allDisabled = false;
-    },
-    submit () {
-      this.validate(valid => {
-        let dynamicList = [];
-        let dynamicError = [];
+      this.$refs.form.validate(valid => {
         if (valid) {
-          const callback = () => {
+          let dynamicList = [];
+          let dynamicError = [];
+          const cb = () => {
             if (!this.validatenull(dynamicError)) {
-              this.$emit("error", dynamicError);
+              callback(false, dynamicError)
               return
             }
             this.show();
-            this.$emit("submit", filterDefaultParams(this.form, this.parentOption.translate), this.hide);
+            callback(true, this.hide)
           }
-          this.asyncValidator(this.formRules, this.form).then(() => {
-          }).catch(err => {
-            this.$emit("error", err.concat(dynamicError));
-          })
           this.dynamicOption.forEach(ele => {
             dynamicError.push({
               field: ele.prop,
@@ -600,20 +589,52 @@ export default create({
             dynamicList.push(this.$refs[ele.prop][0].$refs.temp.validate());
           })
           Promise.all(dynamicList).then(res => {
+            let count = 0;
             res.forEach((err, index) => {
               let objKey = Object.keys(dynamicError);
               if (this.validatenull(err)) {
-                dynamicError.splice(index, 1)
+                dynamicError.splice(count, 1)
                 return
               }
+              count = count + 1;
               if (index == 0) {
                 let count = Object.keys(err)[0]
                 this.$message.error(`【${dynamicError[index].label}】第${Number(count) + 1}行:${err[count][0].message}`);
               }
               dynamicError[objKey[index]].children = err;
             })
-            callback();
+            cb();
           })
+        } else callback(valid, this.hide)
+      });
+    },
+    resetForm () {
+      this.clearValidate();
+      if (this.reset) {
+        this.resetFields();
+        this.clearVal();
+      }
+      this.$emit("input", this.form);
+      this.$emit("reset-change");
+    },
+    clearVal () {
+      this.form = clearVal(this.form)
+    },
+    resetFields () {
+      this.$refs.form.resetFields();
+    },
+    show () {
+      this.allDisabled = true;
+    },
+    hide () {
+      this.allDisabled = false;
+    },
+    submit () {
+      this.validate((valid, msg) => {
+        if (valid) {
+          this.$emit("submit", filterDefaultParams(this.form, this.parentOption.translate), this.hide);
+        } else {
+          this.$emit("error", msg);
         }
       });
     }

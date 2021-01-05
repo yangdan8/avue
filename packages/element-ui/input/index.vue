@@ -1,43 +1,34 @@
 <template>
-  <el-tooltip placement="bottom"
-              :disabled="tipStatus">
-    <div slot="content"
-         v-if="!tipStatus">
-      <el-link type="primary"
-               :href="text"
-               :target="target">{{text}}</el-link>
-    </div>
-    <el-input :class="b()"
-              :size="size"
-              :clearable="disabled?false:clearable"
-              v-model="text"
-              @keyup.enter="isSearch?appendClick():''"
-              @click.native="handleClick"
-              :type="typeParam"
-              :maxlength="maxlength"
-              :minlength="minlength"
-              :autosize="{ minRows: minRows, maxRows: maxRows}"
-              :prefix-icon="prefixIcon"
-              :suffix-icon="suffixIcon"
-              :readonly="readonly"
-              :placeholder="placeholder"
-              :show-word-limit="showWordLimit"
-              @change="handleChange"
-              @focus="handleFocus"
-              @blur="handleBlur"
-              :disabled="disabled"
-              :autocomplete="autocomplete">
-      <template slot="prepend"
-                v-if="prepend"><span @click="prependClick()">{{prepend}}</span>
-      </template>
-      <template slot="append"
-                v-if="append"><span @click="appendClick()">{{append}}</span></template>
-      <el-button slot="append"
-                 v-else-if="isSearch"
-                 icon="el-icon-search"
-                 @click="appendClick()"></el-button>
-    </el-input>
-  </el-tooltip>
+  <el-input :class="b()"
+            :size="size"
+            :clearable="disabled?false:clearable"
+            v-model="text"
+            @keyup.enter="isSearch?appendClick():''"
+            @click.native="handleClick"
+            :type="typeParam"
+            :maxlength="maxlength"
+            :minlength="minlength"
+            :show-password="typeParam=='password'?showPassword:false"
+            :autosize="{ minRows: minRows, maxRows: maxRows}"
+            :prefix-icon="prefixIcon"
+            :suffix-icon="suffixIcon"
+            :readonly="readonly"
+            :placeholder="placeholder"
+            :show-word-limit="showWordLimit"
+            @focus="handleFocus"
+            @blur="handleBlur"
+            :disabled="disabled"
+            :autocomplete="autocomplete">
+    <template slot="prepend"
+              v-if="prepend"><span @click="prependClick()">{{prepend}}</span>
+    </template>
+    <template slot="append"
+              v-if="append"><span @click="appendClick()">{{append}}</span></template>
+    <el-button slot="append"
+               v-else-if="isSearch"
+               icon="el-icon-search"
+               @click="appendClick()"></el-button>
+  </el-input>
 </template>
 
 <script>
@@ -57,6 +48,10 @@ export default create({
     value: {},
     maxlength: "",
     minlength: "",
+    showPassword: {
+      type: Boolean,
+      default: true
+    },
     showWordLimit: {
       type: Boolean,
       default: false
@@ -103,26 +98,9 @@ export default create({
       type: String
     }
   },
-  watch: {
-    text: {
-      handler (value) {
-        this.handleChange(value);
-      },
-      immediate: true
-    }
-  },
   computed: {
-    tipStatus () {
-      if (this.isUrl) {
-        return this.validatenull(this.text)
-      }
-      return true;
-    },
     isSearch () {
       return this.type == 'search'
-    },
-    isUrl () {
-      return this.type == 'url'
     },
     typeParam: function () {
       if (this.type === "textarea") {
@@ -132,23 +110,6 @@ export default create({
       } else {
         return "text";
       }
-    }
-  },
-  methods: {
-    handleClick () {
-      const result = this.text;
-      if (typeof this.click === "function") {
-        this.click({ value: result, column: this.column });
-      }
-    },
-    handleChange (value) {
-      let text = this.text;
-      const result = value;
-      if (typeof this.change === "function") {
-        this.change({ value: result, column: this.column });
-      }
-      this.$emit("input", result);
-      this.$emit("change", result);
     }
   }
 });

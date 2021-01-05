@@ -1,18 +1,18 @@
 import { validatenull } from 'utils/validate';
-import { KEY_COMPONENT_NAME } from 'global/variable';
-import { detailDataType, findObject } from 'utils/util';
+import { KEY_COMPONENT_NAME, DIC_SPLIT, ARRAY_LIST, DATE_LIST, INPUT_LIST, ARRAY_VALUE_LIST, MULTIPLE_LIST, SELECT_LIST } from 'global/variable';
+import { detailDataType, findObject, createObj } from 'utils/util';
 /**
  * 计算级联属性
  */
 export const calcCascader = (list = []) => {
   list.forEach((ele, index) => {
-    if (ele.cascaderItem) {
+    if (!validatenull(ele.cascaderItem)) {
       let cascader = [...ele.cascaderItem];
       let parentProp = ele.prop;
       list[index].cascader = [...cascader];
       cascader.forEach((citem, cindex) => {
         let column = findObject(list, citem);
-        if (!column) return;
+        if (column === -1) return;
         column.parentProp = parentProp;
         column.cascader = [...cascader].splice(cindex + 1);
         parentProp = column.prop;
@@ -39,41 +39,32 @@ export const calcCount = (ele, spanDefault = 12, init = false) => {
   }
   return ele;
 };
-/**
-* 日期控件集合
-*/
-export const dateList = [
-  'dates',
-  'date',
-  'datetime',
-  'datetimerange',
-  'daterange',
-  'week',
-  'month',
-  'monthrange',
-  'dategrpup',
-  'year'
-];
+
 /**
  * 初始化数据格式
  */
-export const initVal = ({ listType, type, multiple, dataType, value }) => {
+export const initVal = ({ type, multiple, dataType, value, callback, separator = DIC_SPLIT }) => {
   let list = value;
   if (
-    (['select', 'tree'].includes(type) && multiple) ||
-    ['daterange', 'datetimerange', 'monthrange', 'timerange', 'datas', 'checkbox', 'cascader', 'dynamic', 'upload', 'img', 'array'].includes(type)
+    (MULTIPLE_LIST.includes(type) && multiple) ||
+    ARRAY_VALUE_LIST.includes(type)
   ) {
-    if (!Array.isArray(value)) {
-      if (validatenull(value)) {
+
+    if (!Array.isArray(list)) {
+      if (validatenull(list)) {
         list = [];
       } else {
-        list = (value || '').split(',') || [];
+        list = (list + '').split(separator) || [];
+        callback && callback(true);
       }
+    } else {
+      callback && callback(false);
     }
     // 数据转化
     list.forEach((ele, index) => {
       list[index] = detailDataType(ele, dataType);
     });
+    if (ARRAY_LIST.includes(type) && validatenull(list)) list = [''];
   }
   return list;
 };
@@ -81,83 +72,44 @@ export const initVal = ({ listType, type, multiple, dataType, value }) => {
 /**
  * 搜索框获取动态组件
  */
-export const getSearchType = (column, component = false) => {
+export const getSearchType = (column) => {
   const type = column.type;
   const range = column.searchRange;
-  let result = type || 'input';
-  if (['select', 'radio', 'checkbox', 'switch'].includes(type)) {
+  let result = type;
+  if (['radio', 'checkbox', 'switch'].includes(type)) {
     result = 'select';
-  } else if (['time', 'timerange'].includes(type)) {
-    result = 'time';
-  } else if (dateList.includes(type)) {
+  } else if (DATE_LIST.includes(type)) {
+    let rangeKey = 'range';
     if (range) {
-      if (type === 'date') {
-        result = 'daterange';
-      } else if (type === 'datetime') {
-        result = 'datetimerange';
-      } else if (type === 'time') {
-        result = 'timerange';
+      if (!type.includes(rangeKey)) {
+        result = type + rangeKey;
       } else {
         result = type;
       }
-    } else {
-      result = type;
-    }
-  } else if (['cascader'].includes(type)) {
-    result = 'cascader';
-  } else if (['number'].includes(type)) {
-    result = 'input-number';
+    } else result = type.replace(rangeKey, '');
   } else if (['textarea'].includes(type)) {
     result = 'input';
   }
-  if (component) {
-    result = KEY_COMPONENT_NAME + result;
-  }
   return result;
-
 };
 
 /**
  * 动态获取组件
  */
 export const getComponent = (type, component) => {
-  let result = 'input';
+  let result = type || 'input';
   if (!validatenull(component)) {
     return component;
-  } else if (['img', 'array'].includes(type)) {
+  } else if (ARRAY_LIST.includes(type)) {
     result = 'array';
-  } else if (type === 'select') {
-    result = 'select';
-  } else if (type === 'radio') {
-    result = 'radio';
-  } else if (type === 'tree') {
-    result = 'input-tree';
-  } else if (type === 'checkbox') {
-    result = 'checkbox';
   } else if (['time', 'timerange'].includes(type)) {
     result = 'time';
-  } else if (dateList.includes(type)) {
+  } else if (DATE_LIST.includes(type)) {
     result = 'date';
-  } else if (type === 'cascader') {
-    result = 'cascader';
-  } else if (type === 'number') {
-    result = 'input-number';
-  } else if (type === 'password') {
+  } else if (['password', 'textarea', 'search'].includes(type)) {
     result = 'input';
-  } else if (type === 'switch') {
-    result = 'switch';
-  } else if (type === 'rate') {
-    result = 'rate';
-  } else if (type === 'upload') {
-    result = 'upload';
-  } else if (type === 'slider') {
-    result = 'slider';
-  } else if (type === 'dynamic') {
-    result = 'dynamic';
-  } else if (type === 'icon-select') {
-    result = 'icon-select';
-  } else if (type === 'color') {
-    result = 'color';
+  } else if (INPUT_LIST.includes(type)) {
+    result = 'input-' + type;
   }
   return KEY_COMPONENT_NAME + result;
 };
@@ -170,30 +122,21 @@ export const formInitVal = (list = []) => {
   let tableForm = {};
   list.forEach(ele => {
     if (
-      ele.type === 'checkbox' ||
-      ele.type === 'cascader' ||
-      ele.type === 'dynamic' ||
-      ele.type === 'daterange' ||
-      ele.type === 'datetimerange' ||
-      ele.type === 'datas' ||
-      ele.type === 'timerange' ||
-      ele.type === 'img' ||
-      ele.type === 'array' ||
-      ele.type === 'dates' ||
-      (ele.type === 'tree' && ele.multiple) ||
-      (ele.type === 'select' && ele.multiple) ||
-      (ele.type === 'upload' && ele.listType !== 'picture-img') ||
-      ele.range ||
-      ele.dataType === 'array'
+      ARRAY_VALUE_LIST.includes(ele.type) ||
+      (MULTIPLE_LIST.includes(ele.type) && ele.multiple) ||
+      ele.range || ele.dataType === 'array'
     ) {
       tableForm[ele.prop] = [];
     } else if (
-      ['number', 'rate', 'slider'].includes(ele.type) ||
+      ['rate', 'slider', 'number'].includes(ele.type) ||
       ele.dataType === 'number'
     ) {
       tableForm[ele.prop] = undefined;
     } else {
       tableForm[ele.prop] = '';
+    }
+    if (ele.bind) {
+      tableForm = createObj(tableForm, ele.bind);
     }
     // 表单默认值设置
     if (!validatenull(ele.value)) {
@@ -205,7 +148,7 @@ export const formInitVal = (list = []) => {
   };
 };
 
-export const getPlaceholder = function(column, type) {
+export const getPlaceholder = function (column, type) {
   const placeholder = column.placeholder;
   const label = column.label;
   if (type === 'search') {
@@ -216,7 +159,7 @@ export const getPlaceholder = function(column, type) {
       return label;
     }
   } else if (validatenull(placeholder)) {
-    if (['select', 'checkbox', 'radio', 'tree'].includes(column.type)) {
+    if (SELECT_LIST.includes(column.type)) {
       return `${this.t('tip.select')} ${label}`;
     } else {
       return `${this.t('tip.input')} ${label}`;

@@ -1,10 +1,11 @@
 <template>
-  <el-input-number v-model="text"
-                   class="avue-input-number"
+  <el-input-number v-model.number="text"
+                   :class="b()"
                    @click.native="handleClick"
                    @focus="handleFocus"
                    @blur="handleBlur"
                    :precision="precision"
+                   :placeholder="placeholder"
                    :size="size"
                    :min="minRows"
                    :max="maxRows"
@@ -12,6 +13,7 @@
                    :clearable="disabled?false:clearable"
                    :readonly="readonly"
                    :controls-position="controlsPosition"
+                   :controls="controls"
                    :label="placeholder"
                    :disabled="disabled"></el-input-number>
 </template>
@@ -27,6 +29,10 @@ export default create({
     return {};
   },
   props: {
+    controls: {
+      type: Boolean,
+      default: true
+    },
     step: {
       type: Number,
       default: 1
@@ -36,8 +42,7 @@ export default create({
       default: "right"
     },
     precision: {
-      type: Number,
-      default: 0
+      type: Number
     },
     minRows: {
       type: Number,
@@ -46,14 +51,6 @@ export default create({
     maxRows: {
       type: Number,
       default: Infinity
-    }
-  },
-  watch: {
-    text: {
-      handler () {
-        this.handleChange(this.text);
-      },
-      immediate: true
     }
   },
   created () { },
